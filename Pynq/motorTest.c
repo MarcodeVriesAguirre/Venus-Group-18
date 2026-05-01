@@ -34,11 +34,7 @@ typedef enum {
 /**
  * Block until the current stepper command is finished.
  */
-// static void wait_until_done(void) {
-//     while (!stepper_steps_done()) {
-//         /* busy wait - stepper hardware handles the actual stepping */
-//     }
-// }
+
 
 static void wait_until_done(void) {
     int timeout_ms = 10000;  // 10 giây tối đa
@@ -50,10 +46,7 @@ static void wait_until_done(void) {
 }
 
 /**
- * Move the robot forward by STEPS_PER_FORWARD steps.
  * Both wheels turn the same direction at the same speed -> straight line.
- *
- * NOTE: with this hardware, NEGATIVE steps drive the robot forward.
  */
 void moveForward(void) {
     printf("[robot] move forward\n");
@@ -62,9 +55,6 @@ void moveForward(void) {
     wait_until_done();
 }
 
-/**
- * Move the robot backward by STEPS_PER_FORWARD steps.
- */
 void moveBackward(void) {
     printf("[robot] move backward\n");
     stepper_set_speed(DEFAULT_SPEED, DEFAULT_SPEED);
