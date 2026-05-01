@@ -20,7 +20,7 @@ pthread_create(&temperature, NULL, temperatureR, &shared);
 pthread_create(&algorithm, NULL, algorithmR, &shared);
 pthread_create(&actuation, NULL, actuationR, &shared);
 
-pthread_join(distance, NULL);
+pthread_join(distance, NULL); //waits for them all to start running
 pthread_join(color, NULL);
 pthread_join(temperature, NULL);
 pthread_join(algorithm, NULL);
