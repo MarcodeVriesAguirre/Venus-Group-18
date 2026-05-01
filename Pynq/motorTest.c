@@ -1,16 +1,11 @@
 /**
  * robotMovement.c
- *
- * Simple robot movement controller using libpynq stepper API.
- * Provides three basic operations: move forward, move backward, rotate.
- *
- * Calibration constants (based on existing project code):
+ * Calibration constants:
  *   - 1600 steps  = 1 full wheel rotation
  *   -  625 steps differential = ~90 degrees rotation
  *   - 1280 steps differential = ~180 degrees rotation
  *
  * Speed value is the time (in microseconds units) between step pulses.
- * Smaller value = faster motor. Range: 3024 (fastest) .. 65535 (slowest).
  */
 
 #include <stdio.h>
@@ -35,7 +30,6 @@ typedef enum {
  * Block until the current stepper command is finished.
  */
 
-
 static void wait_until_done(void) {
     int timeout_ms = 10000;  // 10 giây tối đa
     while (!stepper_steps_done() && timeout_ms > 0) {
@@ -46,6 +40,7 @@ static void wait_until_done(void) {
 }
 
 /**
+ * Move the robot forward by STEPS_PER_FORWARD steps.
  * Both wheels turn the same direction at the same speed -> straight line.
  */
 void moveForward(void) {
