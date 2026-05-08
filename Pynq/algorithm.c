@@ -34,26 +34,56 @@ void dirup(robpos *state, int turn){
     pthread_mutex_unlock(&state->lock);
 }
 
-int main()
-{
-int blocks = 0;
-
-//main while - stops after all blocks are seen
-while(blocks < 5)
+void colorstop()
 {
     //start moving and stop after color sensor send info
-        while(/*no info is sent from color sensor*/)
+        while(1/*no info is sent from color sensor*/)
         {
             //move forward
         }
 
-    //get info from color, distance and temp sensor
-
-    //send it to mapping
-    
-    //turn 90 deg. left for the left one and right for the right one
-    
-    //walk a bit forward and check 
+    //make sensors take info
 }
+
+void walkaound()
+{
+    //turn 90 deg.
+
+    //walk a bit
+
+    //turn and check if it's still there
+
+    //if no continue PREROOMBA, if yes loop
+}
+
+void sendmap()
+{
+
+
+}
+
+int main()
+{
+    int blocks = 0;
+
+    //main while - stops after all blocks are seen
+    while(blocks < 5)
+    {
+        //get to the corners to start ROOMBA - PREROOMBA
+        while(1/*PREROOMBA*/)
+        {
+            //walk forward
+            colorstop();
+            walkaround();
+        }
+
+        //send it to mapping
+        sendmap();
+    
+        //turn 90 deg. left for the left one and right for the right one
+    
+        //walk a bit forward and check 
+        
+    }
     return 0;
 }
