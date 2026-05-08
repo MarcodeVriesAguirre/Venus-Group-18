@@ -1,6 +1,7 @@
 #include <libpynq.h>
 #include <platform.h>
 #include <stepper.h>
+#include "shared.h"
 
 void wait_until_done(void) {
     while (!stepper_steps_done()) {
@@ -20,12 +21,14 @@ void deceleration(int speed){
 void turn_left(void){
     stepper_set_speed(20000, 20000);
     stepper_steps(625, -625);
+    dirup(-1) //update direction
     wait_until_done();
 }
 
 void turn_right(void){
     stepper_set_speed(20000, 20000);
     stepper_steps(-625, 625);
+    dirup(1) //update direction
     wait_until_done();
 }
 
@@ -64,6 +67,8 @@ void forward(int speed, int steps){
 
     stepper_set_speed(speed, speed);
     stepper_steps(steps, steps);
+
+    posup((steps/1600)*7);
 
     wait_until_done();
 }
