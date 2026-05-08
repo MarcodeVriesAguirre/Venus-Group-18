@@ -17,51 +17,69 @@ void deceleration(int speed){
     wait_until_done();
 }
 
+void turn_left(void){
+    stepper_set_speed(20000, 20000);
+    stepper_steps(625, -625);
+    wait_until_done();
+}
+
+void turn_right(void){
+    stepper_set_speed(20000, 20000);
+    stepper_steps(-625, 625);
+    wait_until_done();
+}
+
 void spin(void){
 
-    stepper_set_speed(10000, 10000);
-    stepper_steps(1400, -1400);
+    stepper_set_speed(25000, 25000);
+    stepper_steps(2500, -2500);
     wait_until_done();
 
 }
 
 void look_around(void){
 
-    stepper_set_speed(10000, 10000);
-    stepper_steps(175, -175);
+    stepper_set_speed(30000, 30000);
+    stepper_steps(312, -312);
+    wait_until_done();
+
+    stepper_set_speed(30000, 30000);
+    stepper_steps(-625, 625);
+    wait_until_done();
+
+    stepper_set_speed(30000, 30000);
+    stepper_steps(312, -312);
     wait_until_done();
 
 }
 
-void forward(void){
-    int speed;
+void forward(int speed, int steps){
 
-    stepper_set_speed(8000, 8000);
-        stepper_steps(1600, 1600);
+    stepper_set_speed(speed, speed);
+    stepper_steps(steps, steps);
 
-    for(speed = 8000; speed <= 18000; speed +=2000){
-        stepper_set_speed(speed, speed);
-        stepper_steps(200, 200);
-    }
-
-    wait_until_done();
     
 
+    wait_until_done();
 }
 
+
+
 int main(void) {
-    int speed;
-    int steps; 
+
+    
+
     pynq_init();
     
     stepper_init();
     stepper_enable();
 
-    forward();
-    forward();
+
+    
 
     stepper_destroy();
     pynq_destroy();
 
     return 0;
 }
+
