@@ -63,6 +63,7 @@ void forward(int speed, int steps){
     wait_until_done();
 }
 
+void obstacle
 
 
 int main(void) {
