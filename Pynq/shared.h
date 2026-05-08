@@ -13,4 +13,13 @@ typedef struct {
     pthread_mutex_t lock;
 } sdata;
 
+typedef struct{ //variables for position tracking
+    int dir;
+    int x;
+    int y;
+    pthread_mutex_t lock;
+} robpos;
+
+extern robpos global_state;
+
 #endif
