@@ -2,6 +2,7 @@
 #include <platform.h>
 #include <stepper.h>
 #include "shared.h"
+#define NORMAL_SPEED 12000
 
 void wait_until_done(void) {
     while (!stepper_steps_done()) {
@@ -9,11 +10,16 @@ void wait_until_done(void) {
     }
 }
 
-void deceleration(int speed){
+void set_speed(int *speed_ptr, int new_speed) {
+    *speed_ptr = new_speed;
+    stepper_set_speed(*speed_ptr, *speed_ptr);
+}
 
-    for(int s = speed; s <=18000; s -=2000){
-        stepper_set_speed(s, s);
-        stepper_steps(320,320);
+void deceleration(int *speed_ptr){
+
+    for (int s = *speed_ptr; s <= 18000; s += 1000) {
+        set_speed(speed_ptr, s);
+        stepper_steps(160, 160);
     }
     wait_until_done();
 }
@@ -63,15 +69,15 @@ void look_around(void){
 
 }
 
-void forward(int speed, int steps){
+void forward(int *speed_ptr, int steps){
 
-    stepper_set_speed(speed, speed);
+    stepper_set_speed(speed_ptr, speed_ptr);
     stepper_steps(steps, steps);
 
     posup((steps/1600)*7);
-
-    wait_until_done();
+    
 }
+
 
 void obstacle(void){
 
@@ -120,8 +126,10 @@ int main(void) {
     stepper_init();
     stepper_enable();
 
+    int speed = 13500;
 
-    
+    forward(&speed, 1600);
+    deceleration(&speed);
 
     stepper_destroy();
     pynq_destroy();
