@@ -1,37 +1,47 @@
 #include "shared.h"
 #include <stdio.h>
 #include <unistd.h>
+#include "jegor.c"
 
-robpos global_state = {0, 0, 1, PTHREAD_MUTEX_INITIALIZER};
+bool IsItJulius; //Julius is yes,no is Javier
+int turn; //side its turning
 
-void posup(int distance){ //function for updating x and y coordinates
-    pthread_mutex_lock(&global_state.lock);
-    switch(global_state.dir){
-        case 1: global_state.y += distance; break; //north 
-        case 2: global_state.x += distance; break; //east
-        case 3: global_state.y -= distance; break; //south
-        case 4: global_state.x -= distance; break; //west
+typedef struct{
+int dir;
+int x;
+int y;
+pthread_mutex_t lock;
+} robpos;
+
+
+
+void posup(robpos *state, int distance){
+    pthread_mutex_lock(&state->lock);
+    switch(state->dir){
+        case 1: state->y += distance; break; //north 
+        case 2: state->x += distance; break; //east
+        case 3: state->y -= distance; break; //south
+        case 4: state->x -= distance; break; //west
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
-void dirup(int turn){ //function for updating the direction
-    pthread_mutex_lock(&global_state.lock);
+void dirup(robpos *state, int turn){
+    pthread_mutex_lock(&state->lock);
     //turn=1 for right
     //turn=-1 for left
-    if (global_state.dir==4 && turn==1){
-        global_state.dir = 1;
-    } else if (global_state.dir==1 && turn==-1){
-        global_state.dir = 4;
+    if (state->dir==4 && turn==1){
+        state->dir = 1;
+    } else if (state->dir==1 && turn==-1){
+        state->dir = 4;
     } else {
-        global_state.dir = (global_state.dir + turn);
+        state->dir = (state->dir + turn);
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
-void colorstop()
+void colorstop() //start moving and stop after color sensor send info
 {
-    //start moving and stop after color sensor send info
         while(1/*no info is sent from color sensor*/)
         {
             //move forward
@@ -40,15 +50,14 @@ void colorstop()
     //make sensors take info
 }
 
-void walkaound()
+void walkaound() // maybe obstacle and 
 {
+
+
     //turn 90 deg.
-
     //walk a bit
-
     //turn and check if it's still there
-
-    //if no continue PREROOMBA, if yes loop
+    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
 }
 
 void sendmap()
