@@ -41,7 +41,7 @@ void dirup(int turn){ //function for updating the direction
 void stop()
 {
     //start moving and stop after color sensor send info
-        while(1/*nothing infront && */)
+        while(1/*nothing infront && color not black*/)
         {
             //move forward
         }
@@ -93,20 +93,13 @@ int main()
     //main while - stops after all blocks are seen
     while(blocks < 5)
     {
-        //get to the corners to start ROOMBA - PREROOMBA
-
         //PREROOMBA - Get to corner
-        while(1/*Get to corner*/)
+        while(1/*Get to corner - when distance between */)
         {
             //walk forward
             stop();
             walkaround();
         }
-    
-        //turn 90 deg. left for the left one and right for the right one
-    
-        //walk a bit forward and check 
-        
 
         //ROOMBA - Sweep
     }
