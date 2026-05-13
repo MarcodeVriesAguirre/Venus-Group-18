@@ -3,9 +3,8 @@
 #include <unistd.h>
 #include "jegor.c"
 
-bool IsItJulius;
-
-//Julius is yes,no is Javier
+bool IsItJulius; //Julius is yes,no is Javier
+int turn; //side its turning
 
 typedef struct{
 int dir;
@@ -41,9 +40,8 @@ void dirup(robpos *state, int turn){
     pthread_mutex_unlock(&state->lock);
 }
 
-void colorstop()
+void colorstop() //start moving and stop after color sensor send info
 {
-    //start moving and stop after color sensor send info
         while(1/*no info is sent from color sensor*/)
         {
             //move forward
@@ -52,15 +50,14 @@ void colorstop()
     //make sensors take info
 }
 
-void walkaound()
+void walkaound() // maybe obstacle and 
 {
+
+
     //turn 90 deg.
-    
     //walk a bit
-
     //turn and check if it's still there
-
-    //if no continue PREROOMBA, if yes loop
+    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
 }
 
 void sendmap()
