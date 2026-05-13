@@ -1,0 +1,95 @@
+#include <libpynq.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdarg.h>
+
+#include "color_sensor.h"
+
+#define ROBOT_ID "49"
+
+
+void send_uart_msg(const char *format, ...) {
+    char payload[256];
+    va_list args;
+
+    va_start(args, format);
+    vsnprintf(payload, sizeof(payload), format, args);
+    va_end(args);
+
+    uint32_t len = (uint32_t)strlen(payload);
+
+    int waited_ms = 0;
+
+    while (gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW && waited_ms < 2000) {
+        if (waited_ms == 0) {
+            printf("Waiting for ESP32 ready signal on AR3...\n");
+        }
+
+        sleep_msec(10);
+        waited_ms += 10;
+    }
+
+    if (gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW) {
+        printf("ESP32 not ready after 2 seconds. Skipping UART send.\n");
+        return;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        uart_send(UART0, (uint8_t)((len >> (8 * i)) & 0xFF));
+    }
+
+    for (uint32_t i = 0; i < len; i++) {
+        uart_send(UART0, (uint8_t)payload[i]);
+    }
+
+    printf("UART sent payload: %s\n", payload);
+}
+
+
+int main(void) {
+    pynq_init();
+    switchbox_init();
+    buttons_init();
+
+    printf("Starting robot color communication program...\n");
+
+    // ESP32 ready pin
+    switchbox_set_pin(IO_AR3, SWB_GPIO);
+    gpio_set_direction(IO_AR3, GPIO_DIR_INPUT);
+
+    // UART0 pins connected to ESP32
+    switchbox_set_pin(IO_AR0, SWB_UART0_RX);
+    switchbox_set_pin(IO_AR1, SWB_UART0_TX);
+
+    uart_init(UART0);
+    uart_reset_fifos(UART0);
+
+    // Initialize the color sensor
+    color_sensor_init();
+
+    printf("Robot %s is running.\n", ROBOT_ID);
+    printf("Press Button 0 to stop.\n");
+
+    while (!get_button_state(BUTTON0)) {
+        const char *color = get_color();
+
+        printf("Detected color: %s\n", color);
+
+        // This message matches your laptop Python bridge
+        send_uart_msg("COLOR,%s,%s", ROBOT_ID, color);
+
+        sleep_msec(500);
+    }
+
+    printf("\nStopping robot color communication program...\n");
+
+    color_sensor_destroy();
+
+    uart_destroy(UART0);
+    switchbox_destroy();
+    buttons_destroy();
+    pynq_destroy();
+
+    return 0;
+}
