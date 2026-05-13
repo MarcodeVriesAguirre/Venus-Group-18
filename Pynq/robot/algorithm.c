@@ -1,6 +1,7 @@
 #include "shared.h"
 #include <stdio.h>
 #include <unistd.h>
+#include "movement.c"
 
 #define gridSize 150
 #define blockSize 3
@@ -37,10 +38,10 @@ void dirup(int turn){ //function for updating the direction
     pthread_mutex_unlock(&global_state.lock);
 }
 
-void colorstop()
+void stop()
 {
     //start moving and stop after color sensor send info
-        while(1/*no info is sent from color sensor*/)
+        while(1/*nothing infront && */)
         {
             //move forward
         }
@@ -93,20 +94,21 @@ int main()
     while(blocks < 5)
     {
         //get to the corners to start ROOMBA - PREROOMBA
-        while(1/*PREROOMBA*/)
+
+        //PREROOMBA - Get to corner
+        while(1/*Get to corner*/)
         {
             //walk forward
-            colorstop();
+            stop();
             walkaround();
         }
-
-        //send it to mapping
-        sendmap();
     
         //turn 90 deg. left for the left one and right for the right one
     
         //walk a bit forward and check 
         
+
+        //ROOMBA - Sweep
     }
     return 0;
 }
