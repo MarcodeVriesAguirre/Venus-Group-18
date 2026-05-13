@@ -64,7 +64,7 @@ typedef struct {
 } color_result_t;
 
 /* Shared result variable for other submodules */
-static color_result_t latest_color_result;
+color_result_t latest_color_result;
 
 static uint64_t now_us(void) {
     struct timespec ts;
@@ -243,7 +243,7 @@ static color_t guess_color(raw_reading_t raw, rgb_t rgb) {
     return COLOR_UNKNOWN;
 }
 
-static const char *color_to_string(color_t color) {
+const char *color_to_string(color_t color) {
     switch (color) {
         case COLOR_NO_OBJECT: return "NO OBJECT";
         case COLOR_BLACK:     return "BLACK";
@@ -256,11 +256,11 @@ static const char *color_to_string(color_t color) {
 }
 
 /* This is the code you can send over UART/MQTT as one byte */
-static uint8_t color_to_code(color_t color) {
+uint8_t color_to_code(color_t color) {
     return (uint8_t)color;
 }
 
-static void color_sensor_init(void) {
+void color_sensor_init(void) {
     pynq_init();
 
     switchbox_set_pin(PIN_S0, SWB_GPIO);
@@ -280,7 +280,7 @@ static void color_sensor_init(void) {
 }
 
 /* This is the main function the rest of the robot can call */
-static color_result_t color_sensor_read(void) {
+color_result_t color_sensor_read(void) {
     color_result_t result;
 
     result.raw = read_raw_rgbc();
