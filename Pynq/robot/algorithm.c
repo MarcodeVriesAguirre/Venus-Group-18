@@ -1,47 +1,45 @@
 #include "shared.h"
 #include <stdio.h>
 #include <unistd.h>
-#include "jegor.c"
+
+#define gridSize 150
+#define blockSize 3
 
 bool IsItJulius; //Julius is yes,no is Javier
 int turn; //side its turning
 
-typedef struct{
-int dir;
-int x;
-int y;
-pthread_mutex_t lock;
-} robpos;
+robpos global_state = {0, 0, 1, PTHREAD_MUTEX_INITIALIZER};
 
-
-
-void posup(robpos *state, int distance){
-    pthread_mutex_lock(&state->lock);
-    switch(state->dir){
-        case 1: state->y += distance; break; //north 
-        case 2: state->x += distance; break; //east
-        case 3: state->y -= distance; break; //south
-        case 4: state->x -= distance; break; //west
+void posup(int distance){ //function for updating x and y coordinates
+    //This function are called in movement file when told to move forwards or backwards
+    pthread_mutex_lock(&global_state.lock);
+    switch(global_state.dir){
+        case 1: global_state.y += distance; break; //north 
+        case 2: global_state.x += distance; break; //east
+        case 3: global_state.y -= distance; break; //south
+        case 4: global_state.x -= distance; break; //west
     }
-    pthread_mutex_unlock(&state->lock);
+    pthread_mutex_unlock(&global_state.lock);
 }
 
-void dirup(robpos *state, int turn){
-    pthread_mutex_lock(&state->lock);
+void dirup(int turn){ //function for updating the direction
+    //This function are called in movement file when told to turn left or right
+    pthread_mutex_lock(&global_state.lock);
     //turn=1 for right
     //turn=-1 for left
-    if (state->dir==4 && turn==1){
-        state->dir = 1;
-    } else if (state->dir==1 && turn==-1){
-        state->dir = 4;
+    if (global_state.dir==4 && turn==1){
+        global_state.dir = 1;
+    } else if (global_state.dir==1 && turn==-1){
+        global_state.dir = 4;
     } else {
-        state->dir = (state->dir + turn);
+        global_state.dir = (global_state.dir + turn);
     }
-    pthread_mutex_unlock(&state->lock);
+    pthread_mutex_unlock(&global_state.lock);
 }
 
-void colorstop() //start moving and stop after color sensor send info
+void colorstop()
 {
+    //start moving and stop after color sensor send info
         while(1/*no info is sent from color sensor*/)
         {
             //move forward
@@ -50,14 +48,35 @@ void colorstop() //start moving and stop after color sensor send info
     //make sensors take info
 }
 
-void walkaound() // maybe obstacle and 
+void walkaound()
 {
-
-
     //turn 90 deg.
+
     //walk a bit
+
     //turn and check if it's still there
-    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
+
+    //if no continue PREROOMBA, if yes loop
+}
+
+void createMap(void)
+{
+    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
+    // the created map needs to be double the size of the theoretical map
+    int grid[gridSize/blockSize][gridSize/blockSize]={0};
+}
+
+int coordTranslate(pos)
+{
+    //The grid is represented as a matrix with dimensions [gridSize/blockSize]x[gridSize/blockSize]
+    //and the 0, 0 isn't going to be 0, 0 on the matrix. coordinates therefore need to be translated.
+    int realPos; //this is the position translated to the matrix.
+    realPos=pos+(gridSize/blockSize);
+}
+
+void updateMap(color, distance)
+{
+    
 }
 
 void sendmap()
