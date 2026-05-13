@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "shared.h"
 
+extern color_result_t latest_color_result;
+
 void color_sensor_init(void);
 color_result_t color_sensor_read(void);
 const char *color_to_string(color_t color);
