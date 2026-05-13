@@ -48,13 +48,13 @@ typedef struct {
 
 /* Final color result for the rest of the robot */
 typedef enum {
-    COLOR_UNKNOWN,
-    COLOR_NO_OBJECT,
-    COLOR_BLACK,
-    COLOR_WHITE,
-    COLOR_RED,
-    COLOR_GREEN,
-    COLOR_BLUE
+    COLOR_UNKNOWN   = 0, /* 000 */
+    COLOR_NO_OBJECT = 1, /* 001 */
+    COLOR_BLACK     = 2, /* 010 */
+    COLOR_WHITE     = 3, /* 011 */
+    COLOR_RED       = 4, /* 100 */
+    COLOR_GREEN     = 5, /* 101 */
+    COLOR_BLUE      = 6  /* 110 */
 } color_t;
 
 typedef struct {
@@ -255,6 +255,11 @@ static const char *color_to_string(color_t color) {
     }
 }
 
+/* This is the code you can send over UART/MQTT as one byte */
+static uint8_t color_to_code(color_t color) {
+    return (uint8_t)color;
+}
+
 static void color_sensor_init(void) {
     pynq_init();
 
@@ -307,11 +312,12 @@ int main(void) {
                latest_color_result.raw.blue_us,
                latest_color_result.raw.clear_us);
 
-        printf("RGB: R=%3d G=%3d B=%3d   Guess: %s\n",
+        printf("RGB: R=%3d G=%3d B=%3d   Guess: %s   Code: %u\n",
                latest_color_result.rgb.r,
                latest_color_result.rgb.g,
                latest_color_result.rgb.b,
-               color_to_string(latest_color_result.color));
+               color_to_string(latest_color_result.color),
+               color_to_code(latest_color_result.color));
 
         fflush(stdout);
         delay_us(200000);
