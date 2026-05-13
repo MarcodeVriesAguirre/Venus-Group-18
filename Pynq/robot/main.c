@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <math.h>
 #include "shared.h"
 
 extern void* distanceR(void *arg); // Tells he compiler that the files are elsewhere for these functions.
@@ -79,17 +80,91 @@ int coordTranslate(pos)
     //The grid is represented as a matrix with dimensions [gridSize/blockSize]x[gridSize/blockSize]
     //and the 0, 0 isn't going to be 0, 0 on the matrix. coordinates therefore need to be translated.
     int realPos; //this is the position translated to the matrix.
-    realPos=pos+(gridSize/blockSize);
+    realPos=round(round(pos)/blockSize)+(gridSize/blockSize);
+    return realPos;
+}
+
+void sendmap(xcell, ycell)
+{
+
+
 }
 
 void detectCell(color, distance, width)
 {
-    
-}
+    //call this function when an obstacle is detected
+    //detects which obstacle it is
+    int cellNum;
+    switch(color)
+    {
+        case 000://unknown
+            cellNum=12; //hill
+        break;
+        case 001://no object
+        break;
+        case 010://black
+            if (distance</*placeholder*/ && width</*placeholder*/)
+            {
+                cellNum=4; //small black cube
+            } 
+            else if (distance</*placeholder*/ && width>/*placeholder*/)
+            {
+                cellNum=9; //big black cube (BBC)
+            }
+            else if (distance>/*placeholder*/)
+            {
+                cellNum=11; //hole/border
+            }
+        break;
+        case 011://white
+            if (width</*placeholder*/)
+            {
+                cellNum=5; //small white cube
+            } 
+            else if (width>/*placeholder*/)
+            {
+                cellNum=10; //big white cube
+            }
+        break;
+        case 100://red
+            if (width</*placeholder*/)
+            {
+                cellNum=1; //small red cube
+            } 
+            else if (width>/*placeholder*/)
+            {
+                cellNum=6; //big red cube
+            }
+        break;
+        case 101://green
+            if (width</*placeholder*/)
+            {
+                cellNum=2; //small green cube
+            } 
+            else if (width>/*placeholder*/)
+            {
+                cellNum=7; //big green cube
+            }
+        break;
+        case 110://blue
+            if (width</*placeholder*/)
+            {
+                cellNum=3; //small blue cube
+            } 
+            else if (width>/*placeholder*/)
+            {
+                cellNum=8; //big blue cube
+            }
+        break;
+        case 111://unused
+        break;
+        
+        int xcell = coordTranslate(global_state.x); //gets the current position on the grid
+        int ycell = coordTranslate(global_state.y);
 
-void sendmap()
-{
-
+        grid[xcell][ycell]=cellNum; //updates the grid
+        sendmap(xcell, ycell); //calls the function for sending data to computer
+    }
 
 }
 
