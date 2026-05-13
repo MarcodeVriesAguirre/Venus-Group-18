@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "shared.h"
+#include "main.c"
 
 extern color_result_t latest_color_result;
 
