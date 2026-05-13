@@ -1,7 +1,7 @@
 #include "shared.h"
 #include <stdio.h>
 #include <unistd.h>
-#include "jegor.c"
+#include "movement.c"
 
 bool IsItJulius; //Julius is yes,no is Javier
 int turn; //side its turning

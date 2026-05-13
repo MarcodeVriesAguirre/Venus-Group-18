@@ -1,0 +1,4 @@
+main
+*.o
+*.d
+__pycache__/
