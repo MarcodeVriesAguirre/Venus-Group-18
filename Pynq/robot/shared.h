@@ -8,7 +8,7 @@ typedef struct {
     int colorD;
     int temperatureD;
     int algorithmD;
-    int actuatorD;
+    int movementD;
     int running; //The condition for it to be running
     pthread_mutex_t lock;
 } sdata;

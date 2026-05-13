@@ -19,20 +19,16 @@ void deceleration(int speed){
 }
 
 void turn_left(void){
-    pthread_mutex_lock(&global_state.lock);
     stepper_set_speed(20000, 20000);
     stepper_steps(625, -625);
     dirup(-1) //update direction
-    pthread_mutex_unlock(&global_state.lock);
     wait_until_done();
 }
 
 void turn_right(void){
-    pthread_mutex_lock(&global_state.lock);
     stepper_set_speed(20000, 20000);
     stepper_steps(-625, 625);
     dirup(1) //update direction
-    pthread_mutex_unlock(&global_state.lock);
     wait_until_done();
 }
 
@@ -69,14 +65,11 @@ void look_around(void){
 
 void forward(int speed, int steps){
 
-    pthread_mutex_lock(&global_state.lock);
-
     stepper_set_speed(speed, speed);
     stepper_steps(steps, steps);
 
     posup((steps/1600)*7);
 
-    pthread_mutex_lock(&global_state.lock);
     wait_until_done();
 
 }

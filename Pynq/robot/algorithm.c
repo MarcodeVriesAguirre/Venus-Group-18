@@ -74,7 +74,7 @@ int coordTranslate(pos)
     realPos=pos+(gridSize/blockSize);
 }
 
-void updateMap(color, distance)
+void detectCell(color, distance, width)
 {
     
 }
