@@ -5,6 +5,9 @@
 #define gridSize 150
 #define blockSize 3
 
+bool IsItJulius; //Julius is yes,no is Javier
+int turn; //side its turning
+
 robpos global_state = {0, 0, 1, PTHREAD_MUTEX_INITIALIZER};
 
 void posup(int distance){ //function for updating x and y coordinates
