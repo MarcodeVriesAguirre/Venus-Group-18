@@ -131,10 +131,42 @@ int main(void) {
     stepper_init();
     stepper_enable();
 
-    int speed = 13500;
+    int speed = 15000;
 
-    forward(&speed, 1600);
-    deceleration(&speed);
+    while(1){
+    stepper_set_speed(speed, speed);
+    stepper_steps(300, 300);
+    
+    if(obstacle){
+        wait_until_done();
+    }
+
+    }
+
+    while(1){
+
+        if(clean){
+            stepper_set_speed(15000, 15000);
+            stepper_steps(300, 300); 
+        }
+
+        if(obstacle){
+        
+        }
+        sleep_msec(45);
+    }
+
+    while(1){
+        stepper_set_speed(15000, 15000);
+        stepper_steps(300, 300); 
+
+        while(obstacle != 1){
+            sleep_msec(45);
+        }
+        
+    }
+
+
 
     stepper_destroy();
     pynq_destroy();
