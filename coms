@@ -1,27 +1,52 @@
 #include <libpynq.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <string.h>
-#include <stdarg.h>
+#include <stdbool.h>
 
-#include "color_sensor.h"
+#define UART_READY_PIN IO_AR3
 
-#define ROBOT_ID "49"
+#define GRID_MAX_X 99
+#define GRID_MAX_Y 99
 
+#define PAYLOAD_LENGTH_BYTES 4u
 
-void send_uart_msg(const char *format, ...) {
-    char payload[256];
-    va_list args;
+#define Y_SHIFT       0
+#define X_SHIFT       7
+#define OBJECT_SHIFT  14
 
-    va_start(args, format);
-    vsnprintf(payload, sizeof(payload), format, args);
-    va_end(args);
+#define COORD_MASK    0x7Fu
+#define OBJECT_MASK   0x0Fu
 
-    uint32_t len = (uint32_t)strlen(payload);
+typedef enum {
+    OBJ_NONE = 0,
 
+    OBJ_SMALL_RED   = 1,
+    OBJ_SMALL_GREEN = 2,
+    OBJ_SMALL_BLUE  = 3,
+    OBJ_SMALL_BLACK = 4,
+    OBJ_SMALL_WHITE = 5,
+
+    OBJ_LARGE_RED   = 6,
+    OBJ_LARGE_GREEN = 7,
+    OBJ_LARGE_BLUE  = 8,
+    OBJ_LARGE_BLACK = 9,
+    OBJ_LARGE_WHITE = 10,
+
+    OBJ_CRATER_OR_HOLE = 11,
+    OBJ_HILL           = 12
+} object_code_t;
+
+static void uart_send_u32_le(uint32_t value) {
+    uart_send(UART0, (uint8_t)((value >> 0)  & 0xFF));
+    uart_send(UART0, (uint8_t)((value >> 8)  & 0xFF));
+    uart_send(UART0, (uint8_t)((value >> 16) & 0xFF));
+    uart_send(UART0, (uint8_t)((value >> 24) & 0xFF));
+}
+
+static bool wait_for_esp_ready(void) {
     int waited_ms = 0;
 
-    while (gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW && waited_ms < 2000) {
+    while (gpio_get_level(UART_READY_PIN) == GPIO_LEVEL_LOW && waited_ms < 2000) {
         if (waited_ms == 0) {
             printf("Waiting for ESP32 ready signal on AR3...\n");
         }
@@ -30,33 +55,72 @@ void send_uart_msg(const char *format, ...) {
         waited_ms += 10;
     }
 
-    if (gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW) {
+    if (gpio_get_level(UART_READY_PIN) == GPIO_LEVEL_LOW) {
         printf("ESP32 not ready after 2 seconds. Skipping UART send.\n");
-        return;
+        return false;
     }
 
-    for (int i = 0; i < 4; i++) {
-        uart_send(UART0, (uint8_t)((len >> (8 * i)) & 0xFF));
-    }
-
-    for (uint32_t i = 0; i < len; i++) {
-        uart_send(UART0, (uint8_t)payload[i]);
-    }
-
-    printf("UART sent payload: %s\n", payload);
+    return true;
 }
 
+static bool pack_object_message(uint8_t x, uint8_t y, object_code_t object, uint32_t *packet_out) {
+    if (packet_out == NULL) {
+        return false;
+    }
 
-int main(void) {
-    pynq_init();
-    switchbox_init();
-    buttons_init();
+    if (x > GRID_MAX_X || y > GRID_MAX_Y) {
+        printf("Invalid grid location: x=%u, y=%u. Valid range is 0..99.\n", x, y);
+        return false;
+    }
 
-    printf("Starting robot color communication program...\n");
+    if ((uint8_t)object > 15) {
+        printf("Invalid object code: %u. Object must fit in 4 bits, so range is 0..15.\n",
+               (uint8_t)object);
+        return false;
+    }
 
+    uint32_t packet = 0;
+
+    packet |= (((uint32_t)object & OBJECT_MASK) << OBJECT_SHIFT);
+    packet |= (((uint32_t)x      & COORD_MASK)  << X_SHIFT);
+    packet |= (((uint32_t)y      & COORD_MASK)  << Y_SHIFT);
+
+    *packet_out = packet;
+    return true;
+}
+
+bool send_object_packet(uint8_t x, uint8_t y, object_code_t object) {
+    uint32_t packet;
+
+    if (!pack_object_message(x, y, object, &packet)) {
+        return false;
+    }
+
+    if (!wait_for_esp_ready()) {
+        return false;
+    }
+
+    // First 32-bit word: payload length in bytes.
+    // The payload is one uint32_t, so this must be 4, not 32.
+    uart_send_u32_le(PAYLOAD_LENGTH_BYTES);
+
+    // Second 32-bit word: packed location/object payload.
+    uart_send_u32_le(packet);
+
+    printf("UART sent binary packet: length=%u bytes, payload=0x%08X, x=%u, y=%u, object=%u\n",
+           PAYLOAD_LENGTH_BYTES,
+           packet,
+           x,
+           y,
+           (uint8_t)object);
+
+    return true;
+}
+
+static void setup_uart_to_esp(void) {
     // ESP32 ready pin
-    switchbox_set_pin(IO_AR3, SWB_GPIO);
-    gpio_set_direction(IO_AR3, GPIO_DIR_INPUT);
+    switchbox_set_pin(UART_READY_PIN, SWB_GPIO);
+    gpio_set_direction(UART_READY_PIN, GPIO_DIR_INPUT);
 
     // UART0 pins connected to ESP32
     switchbox_set_pin(IO_AR0, SWB_UART0_RX);
@@ -64,27 +128,29 @@ int main(void) {
 
     uart_init(UART0);
     uart_reset_fifos(UART0);
+}
 
-    // Initialize the color sensor
-    color_sensor_init();
+int main(void) {
+    pynq_init();
+    switchbox_init();
+    buttons_init();
 
-    printf("Robot %s is running.\n", ROBOT_ID);
+    setup_uart_to_esp();
+
+    printf("Starting binary communication program...\n");
     printf("Press Button 0 to stop.\n");
 
     while (!get_button_state(BUTTON0)) {
-        const char *color = get_color();
+        uint8_t x = 12;
+        uint8_t y = 34;
+        object_code_t object = OBJ_LARGE_BLUE;
 
-        printf("Detected color: %s\n", color);
-
-        // This message matches your laptop Python bridge
-        send_uart_msg("COLOR,%s,%s", ROBOT_ID, color);
+        send_object_packet(x, y, object);
 
         sleep_msec(500);
     }
 
-    printf("\nStopping robot color communication program...\n");
-
-    color_sensor_destroy();
+    printf("Stopping binary communication program...\n");
 
     uart_destroy(UART0);
     switchbox_destroy();
