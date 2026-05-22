@@ -8,7 +8,7 @@
 #define gridSize 150
 #define blockSize 3
 
-double distance(void){ //function for the distance sensor
+int distance(void){ //function for the distance sensor
 
 }
 
@@ -31,6 +31,12 @@ void posup(int distance){ //function for updating x and y coordinates
 void dirup(int turn){ //function for updating the direction
 }
 
+void createMap(void)
+{
+    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
+    // the created map needs to be double the size of the theoretical map
+    int grid[gridSize/blockSize][gridSize/blockSize]={0};
+}
 
 void sendmap(xcell, ycell) 
 {
