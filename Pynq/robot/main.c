@@ -8,7 +8,7 @@
 #define gridSize 150
 #define blockSize 3
 
-int distance(void){ //function for the distance sensor
+uint32_t distance(void){ //function for the distance sensor
 
 }
 
