@@ -28,14 +28,16 @@ int infrared(void){ //function for infrared sensor
 
 void posup(float *pos, float *angle){ //function for updating x and y coordinates
     pos[1]+=moveperstep*cos(*angle);
+    printf("Coordinates: (%f, %f)", pos[1], pos[2]);
 }
 
 void dirup(float *angle, int rightorleft){ //function for updating the direction
     if (rightorleft==0){ //left
         angle+=radperstep;
-    } else {
+    } else { //right
         angle-=radperstep;
     }
+    printf("Angle: %f", angle);
 }
 
 void createMap(void)
@@ -53,8 +55,9 @@ void sendmap(xcell, ycell)
 
 void detectCell(color, distance, width)
 {
+
 }
 
 int main(){
-    
+
 }
