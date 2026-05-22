@@ -127,3 +127,25 @@ void createMap(void)
     // the created map needs to be double the size of the theoretical map
     int grid[gridSize/blockSize][gridSize/blockSize]={0};
 }
+
+void colorstop()
+{
+    //start moving and stop after color sensor send info
+        while(1/*no info is sent from color sensor*/)
+        {
+            //move forward
+        }
+
+    //make sensors take info
+}
+
+void walkaound()
+{
+    //turn 90 deg.
+
+    //walk a bit
+
+    //turn and check if it's still there
+
+    //if no continue PREROOMBA, if yes loop
+}
