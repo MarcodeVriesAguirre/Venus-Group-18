@@ -25,7 +25,7 @@ int infrared(void){ //function for infrared sensor
 }
 
 void posup(int distance){ //function for updating x and y coordinates
-
+    
 }
 
 void dirup(int turn){ //function for updating the direction
