@@ -89,28 +89,6 @@ pthread_join(color, NULL);
 pthread_join(temperature, NULL);
 pthread_join(actuation, NULL);
 
-    int blocks = 0;
-
-    //main while - stops after all blocks are seen
-    while(blocks < 5)
-{        //get to the corners to start ROOMBA - PREROOMBA
-    while(1/*PREROOMBA*/)
-   {
-        //walk forward
-        colorstop();
-        walkaround();
-    }
-
-        //send it to mapping
-        sendmap();
-    
-        //turn 90 deg. left for the left one and right for the right one
-    
-        //walk a bit forward and check 
-        
- }
- return 0;
-
 
 pthread_mutex_destroy(&shared.lock);
 printf("system stopped");
