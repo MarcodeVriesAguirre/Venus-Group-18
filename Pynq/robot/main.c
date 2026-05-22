@@ -7,6 +7,8 @@
 
 #define gridSize 150
 #define blockSize 3
+#define moveperstep 0.13744
+#define radperstep 0,05026548
 
 uint32_t distance(void){ //function for the distance sensor
 
@@ -24,11 +26,16 @@ int infrared(void){ //function for infrared sensor
 
 }
 
-void posup(int distance){ //function for updating x and y coordinates
-    
+void posup(float *pos, float *angle){ //function for updating x and y coordinates
+    pos[1]+=moveperstep*cos(*angle);
 }
 
-void dirup(int turn){ //function for updating the direction
+void dirup(float *angle, int rightorleft){ //function for updating the direction
+    if (rightorleft==0){ //left
+        angle+=radperstep;
+    } else {
+        angle-=radperstep;
+    }
 }
 
 void createMap(void)
@@ -49,5 +56,5 @@ void detectCell(color, distance, width)
 }
 
 int main(){
-
+    
 }
