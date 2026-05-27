@@ -477,21 +477,8 @@ int main(void) {
     while (1) {
         latest_color_result = color_sensor_read();
 
-        // printf("Raw: R=%3u us  G=%3u us  B=%3u us  C=%3u us   ",
-        //        latest_color_result.raw.red_us,
-        //        latest_color_result.raw.green_us,
-        //        latest_color_result.raw.blue_us,
-        //        latest_color_result.raw.clear_us);
-
-        // printf("RGB: R=%3d G=%3d B=%3d   Guess: %s   Code: %u\n",
-        //        latest_color_result.rgb.r,
-        //        latest_color_result.rgb.g,
-        //        latest_color_result.rgb.b,
-        //        color_to_string(latest_color_result.color),
-        //        color_to_code(latest_color_result.color));
 
         fflush(stdout);
-        /*delay_us(200000); */
 
         stepper_set_speed(speed, speed);
         stepper_steps(10, 10);
