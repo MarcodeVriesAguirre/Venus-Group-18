@@ -1,51 +1,27 @@
 #include <libpynq.h>
-#include <iic.h>
-#include "vl53l0x.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
- /*
- *  TU/e 5EID0::LIBPYNQ Driver for VL53L0X TOF Sensor
- *  Example Code 
- * 
- *  Original: Larry Bank
- *  Adapted for PYNQ: Walthzer
- * 
- */
-
-extern int vl53l0x_example_single();
-extern int vl53l0x_example_dual();
-
-/** This Example program REQUIRES ALL OF:
- * - single.c
- * - dual.c
- * To be present.
-**/
+#define PIN_D0 IO_AR9
 
 int main(void) {
   	pynq_init();
 
-	//Setting up the buttons & LEDs
-	//Init the IIC pins
-	switchbox_set_pin(IO_AR_SCL, SWB_IIC0_SCL);
-	switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
-	iic_init(IIC0);
+    adc_init();
 
-	/**Test Scripts: Select ONE!
-	 * - Single Sensor -> vl53l0x_example_single();
-	 * - Dual Sensor -> vl53l0x_example_dual();
-	**/	
+	switchbox_set_pin(PIN_D0, SWB_GPIO);
+	gpio_set_direction(PIN_D0, GPIO_DIR_INPUT);
 
-	/** Connect one sensor to the IIC bus and enjoy! **/
-	vl53l0x_example_single();
+    printf("Reading");
 
-	/** Connect two sensors to the IIC bus
-	 * ONLY CONNECT ONE TO 5V and GND
-	 * --If the second sensor is connected to either 5v or GND
-	 * --Before the first is initialized, they conflict.
-	 * Run the program and follow instructions! **/
-	//vl53l0x_example_dual();
+    while(1){
+        int digital = gpio_get_level(PIN_D0);
 
-	iic_destroy(IIC0);
+        printf("%d", digital);
+        sleep(1);
+    }
+    
 	pynq_destroy();
 	return EXIT_SUCCESS;
 }
