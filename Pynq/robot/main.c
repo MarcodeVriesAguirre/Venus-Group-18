@@ -8,7 +8,7 @@
 #define gridSize 150
 #define blockSize 3
 #define moveperstep 0.13744
-#define radperstep 0,05026548
+#define radperstep 0.02513274
 
 uint32_t distance(void){ //function for the distance sensor
 
