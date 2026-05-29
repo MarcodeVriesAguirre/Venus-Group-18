@@ -65,7 +65,7 @@ char kube;
 float angle_L;
 float angle_R;
 float angle_T;
-char color
+char color;
 if(distance << 30){
     wait_until_done();
     latest_color_result = color_sensor_read();
@@ -108,12 +108,56 @@ if(distance << 30){
     size = sqrt(pow(left_side, 2) + pow(right_side, 2) - 2 * left_side * right_side * cos(angle_T));
 
     if(size >> 43){
-        kube = B;
-        return kube;
+        if(color == R){
+            kube = R;
+            return kube;
+        }
+        if(color == W){
+            kube = W;
+            return kube;
+        }
+        if(color == G){
+            kube = G;
+            return kube;
+        }
+        if(color == R){
+            kube = R;
+            return kube;
+        }
+        if(color == B){
+            kube = B;
+            return kube;
+        }
+        if(color == b){
+            kube = E;
+            return kube;
+        }
     }
     else{
-        kube = S;
-        return kube;
+        if(color == R){
+            cube = r;
+            return kube;
+        }
+        if(color == W){
+            kube = w;
+            return kube;
+        }
+        if(color == G){
+            kube = g;
+            return kube;
+        }
+        if(color == R){
+            kube = r;
+            return kube;
+        }
+        if(color == B){
+            kube = b;
+            return kube;
+        }
+        if(color == b){
+            kube = e;
+            return kube;
+        }
     }
 }
 }
