@@ -47,13 +47,13 @@ void spin(void){
     wait_until_done();
 
 }
-void 180(void){
+// void 180(void){
 
-    stepper_set_speed(25000, 25000);
-    stepper_steps(1250, -1250);
-    wait_until_done();
+//     stepper_set_speed(25000, 25000);
+//     stepper_steps(1250, -1250);
+//     wait_until_done();
 
-}
+// }
 
 void look_around(void){
 
@@ -80,101 +80,101 @@ void forward(int *speed_ptr, int steps){
     wait_until_done();
 }
 
-void move(int *speed_ptr, int steps){
+// void move(int *speed_ptr, int steps){
 
-    stepper_set_speed(1000, 1000);
-    stepper_steps(10, 10);
-    wait_until_done();
-}
-
-
-void obstacle(void){
-
-    turn_left();
-    look_around();
-
-    if(distance >> 30){
-        while(1){
-            forward(15000, 400);
-            turn_right();
-
-            if(distance >> 30){
-                return;
-            }
-            turn_left();
-        }
-    }
-
-    if(distance << 30){
-        180();
-        if(distance >> 30){
-            while(1){
-                forward(15000, 400);
-                turn_left();
-
-                if(distance >> 30){
-                    return;
-                }
-                turn_right();
-            }
-        }
-        if(distance << 30){
-            turn_right();
-            return;
-        }
-    }
-}
+//     stepper_set_speed(1000, 1000);
+//     stepper_steps(10, 10);
+//     wait_until_done();
+// }
 
 
-int main(void) {
+// void obstacle(void){
+
+//     turn_left();
+//     look_around();
+
+//     if(distance >> 30){
+//         while(1){
+//             forward(15000, 400);
+//             turn_right();
+
+//             if(distance >> 30){
+//                 return;
+//             }
+//             turn_left();
+//         }
+//     }
+
+//     if(distance << 30){
+//         180();
+//         if(distance >> 30){
+//             while(1){
+//                 forward(15000, 400);
+//                 turn_left();
+
+//                 if(distance >> 30){
+//                     return;
+//                 }
+//                 turn_right();
+//             }
+//         }
+//         if(distance << 30){
+//             turn_right();
+//             return;
+//         }
+//     }
+// }
+
+
+// int main(void) {
 
     
 
-    pynq_init();
+//     pynq_init();
     
-    stepper_init();
-    stepper_enable();
+//     stepper_init();
+//     stepper_enable();
 
-    int speed = 15000;
+//     int speed = 15000;
 
-    while(1){
-    stepper_set_speed(speed, speed);
-    stepper_steps(300, 300);
+//     while(1){
+//     stepper_set_speed(speed, speed);
+//     stepper_steps(300, 300);
     
-    if(obstacle){
-        wait_until_done();
-    }
+//     if(obstacle){
+//         wait_until_done();
+//     }
 
-    }
+//     }
 
-    while(1){
+//     while(1){
 
-        if(clean){
-            stepper_set_speed(15000, 15000);
-            stepper_steps(300, 300); 
-        }
+//         if(clean){
+//             stepper_set_speed(15000, 15000);
+//             stepper_steps(300, 300); 
+//         }
 
-        if(obstacle){
+//         if(obstacle){
         
-        }
-        sleep_msec(45);
-    }
+//         }
+//         sleep_msec(45);
+//     }
 
-    while(1){
-        stepper_set_speed(15000, 15000);
-        stepper_steps(300, 300); 
+//     while(1){
+//         stepper_set_speed(15000, 15000);
+//         stepper_steps(300, 300); 
 
-        while(obstacle != 1){
-            sleep_msec(45);
-        }
+//         while(obstacle != 1){
+//             sleep_msec(45);
+//         }
         
-    }
+//     }
 
 
 
-    stepper_destroy();
-    pynq_destroy();
+//     stepper_destroy();
+//     pynq_destroy();
 
-    return 0;
+//     return 0;
 }
 

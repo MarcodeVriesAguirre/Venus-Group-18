@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/select.h> // Added for non-blocking stdin
-#include <unistd.h>     // Added for STDIN_FILENO
+#include <sys/select.h> 
+#include <unistd.h>    
 
 #define MAX_LEN 200
 
@@ -11,7 +11,6 @@ void send_message(char *msg)
 {
     char buffer[MAX_LEN];
     
-    // FIX 1: Add the newline back so the Wi-Fi bridge flushes immediately over MQTT
     snprintf(buffer, sizeof(buffer), "%s\n", msg);
     uint32_t len = strlen(buffer);
 
@@ -23,7 +22,6 @@ void send_message(char *msg)
     for (uint32_t i = 0; i < len; i++)
         uart_send(UART0, buffer[i]);
 
-    // FIX 2: Force the terminal to draw the text instantly
     fprintf(stderr, "Sent: %s", buffer);
     fflush(stderr); 
 }
@@ -50,9 +48,7 @@ int main(void)
 
     while (1)
     {
-        // =====================
-        //  RECEIVE (non-blocking)
-        // =====================
+      
         if (bytes_read < 4)
         {
             while (uart_has_data(UART0) && bytes_read < 4)
@@ -87,7 +83,6 @@ int main(void)
             {
                 buffer[len] = '\0';
                 
-                // Clean up any stray newlines from the sender for a pretty terminal
                 buffer[strcspn(buffer, "\r\n")] = 0; 
                 
                 fprintf(stderr, "Received: %s\n", buffer);
@@ -98,30 +93,24 @@ int main(void)
             }
         }
 
-        // =====================
-        // SEND (TRULY non-blocking input)
-        // =====================
-        
-        // FIX 3: Set up select() to peek at the keyboard without stopping the loop
         fd_set readfds;
         struct timeval tv;
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
         tv.tv_sec = 0;
-        tv.tv_usec = 0; // A 0 timeout means "check instantly and keep moving"
+        tv.tv_usec = 0; 
 
-        // select() returns > 0 ONLY if you have pressed Enter
         if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv) > 0)
         {
             if (fgets(input, sizeof(input), stdin) != NULL)
             {
-                input[strcspn(input, "\n")] = 0; // Strip it so send_message can safely re-format it
+                input[strcspn(input, "\n")] = 0; 
                 send_message(input);
             }
         }
 
-        sleep_msec(10); // Prevent CPU maxing
+        sleep_msec(10); 
     }
 
     pynq_destroy();

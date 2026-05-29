@@ -8,17 +8,16 @@
 int main(void) {
   	pynq_init();
 
-    adc_init();
-
 	switchbox_set_pin(PIN_D0, SWB_GPIO);
 	gpio_set_direction(PIN_D0, GPIO_DIR_INPUT);
 
-    printf("Reading");
+    setbuf(stdout, NULL);
+    printf("Reading\n");
 
     while(1){
         int digital = gpio_get_level(PIN_D0);
 
-        printf("%d", digital);
+        printf("%d\n", digital);
         sleep(1);
     }
     

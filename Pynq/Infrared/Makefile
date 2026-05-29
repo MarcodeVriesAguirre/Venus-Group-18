@@ -1,6 +1,6 @@
 include ../shared.mk
 
-SOURCES:=algorithm.c vl53l0x.c
+SOURCES:=$(wildcard *.c)
 CFLAGS+=-Werror
 
 include ../end.mk
