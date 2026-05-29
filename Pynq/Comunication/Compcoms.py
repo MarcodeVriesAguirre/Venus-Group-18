@@ -1,63 +1,72 @@
 import paho.mqtt.client as mqtt
+import time
 
-HOST = "mqtt.ics.ele.tue.nl"
-PORT = 1883
-
-USER = "robot_5_1"
+MQTT_BROKER = "mqtt.ics.ele.tue.nl"
+USERNAME = "robot_5_1"
 PASSWORD = "2hHjtag4"
 
-MODULE = "robot_5_1"
+SEND_TOPICS = [
+  
+    "/pynqbridge/robot_5_1/send",
+    "/pynqbridge/5/send",
+    "/pynqbridge/5_1/send",
+    "/PYNQBRIDGE/5_1/SEND",
+    "/PYNQBRIDGE/robot_5_1/SEND",
+    "/PYNQBRIDGE/5/SEND",
+]
 
-SEND_TOPIC = f"/PYNQBRIDGE/{MODULE}/SEND"
-
-RECV_TOPIC = f"/PYNQBRIDGE/{MODULE}/RECV"
-
-
-def parse_fields(text):
-    data = {}
-    fields = text.split(";")
-    for field in fields:
-        if "=" in field:
-            key, value = field.split("=", 1)
-            data[key.strip()] = value.strip()
-    return data
+RECV_TOPICS = [
+    "/pynqbridge/5_1/recv",
+    "/pynqbridge/robot_5_1/recv",
+    "/pynqbridge/5/recv",
+    "/PYNQBRIDGE/5_1/RECV",
+    "/PYNQBRIDGE/robot_5_1/RECV",
+    "/PYNQBRIDGE/5/RECV",
+]
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
     print("Connected:", reason_code)
 
-    if reason_code.value != 0:
-        print("Connection failed:", reason_code)
-        return
-
-    client.subscribe(SEND_TOPIC)
-    print("Listening on:", SEND_TOPIC)
+    for topic in SEND_TOPICS:
+        result, mid = client.subscribe(topic)
+        print("Subscribing to:", topic, "result:", result)
 
 
 def on_message(client, userdata, message):
-    print("\n========== MQTT MESSAGE ==========")
+    print("\n========== MESSAGE FROM MQTT ==========")
     print("Topic  :", message.topic)
-    print("Raw    :", message.payload)
-
-    text = message.payload.decode(errors="replace")
-    print("Text   :", text)
-
-    data = parse_fields(text)
-
-    if data:
-        print("Fields :")
-        for key, value in data.items():
-            print(f"  {key}: {value}")
-    else:
-        print("No KEY=VALUE fields found.")
-
-    print("==================================")
+    print("Payload:", message.payload.decode(errors="replace"))
+    print("=======================================")
 
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client.username_pw_set(USER, PASSWORD)
+client.username_pw_set(USERNAME, PASSWORD)
+
 client.on_connect = on_connect
 client.on_message = on_message
 
-client.connect(HOST, PORT, 60)
-client.loop_forever()
+print(f"Connecting to {MQTT_BROKER}...")
+client.connect(MQTT_BROKER, 1883, 60)
+
+client.loop_start()
+time.sleep(2)
+
+print("\nListening for PYNQ messages.")
+print("Type a message and press Enter to send it to the robot.")
+print("Press CTRL+C to stop.\n")
+
+try:
+    while True:
+        text = input("ENTER COMMAND: ")
+
+        for topic in RECV_TOPICS:
+            info = client.publish(topic, text)
+            info.wait_for_publish()
+            print("Published to:", topic)
+
+except KeyboardInterrupt:
+    print("\nStopping...")
+
+client.loop_stop()
+client.disconnect()
