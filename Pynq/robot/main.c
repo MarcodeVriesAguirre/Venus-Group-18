@@ -6,6 +6,10 @@
 #include "shared.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <sys/select.h>
+
+#define MAX_LEN 200
 
 #define gridSize 150
 #define blockSize 3
@@ -331,10 +335,41 @@ void createMap(void)
     int grid[gridSize/blockSize][gridSize/blockSize]={0};
 }
 
-void sendmap(xcell, ycell) 
+void sendmap(int xcell, int ycell) 
 {
+    static int uart_ready = 0;
 
+    if (!uart_ready)
+    {
+        switchbox_set_pin(IO_AR0, SWB_UART0_RX);
+        switchbox_set_pin(IO_AR1, SWB_UART0_TX);
 
+        uart_init(UART0);
+        uart_reset_fifos(UART0);
+
+        uart_ready = 1;
+    }
+
+    char message[100];
+    snprintf(message, sizeof(message), "XCELL=%d;YCELL=%d", xcell, ycell);
+
+    char buffer[200];
+    snprintf(buffer, sizeof(buffer), "%s\n", message);
+
+    uint32_t len = strlen(buffer);
+
+    uart_send(UART0, (len) & 0xFF);
+    uart_send(UART0, (len >> 8) & 0xFF);
+    uart_send(UART0, (len >> 16) & 0xFF);
+    uart_send(UART0, (len >> 24) & 0xFF);
+
+    for (uint32_t i = 0; i < len; i++)
+    {
+        uart_send(UART0, buffer[i]);
+    }
+
+    fprintf(stderr, "Sent map: %s", buffer);
+    fflush(stderr);
 }
 
 void detectCell(color, width)
