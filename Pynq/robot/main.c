@@ -299,7 +299,7 @@ color_result_t color_sensor_read(void) {
 }
 
 uint32_t distance(void){ //function for the distance sensor
-
+    return 
 }
 
 int color(void){ //function for color sensor
