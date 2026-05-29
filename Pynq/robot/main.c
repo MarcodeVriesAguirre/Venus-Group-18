@@ -11,7 +11,7 @@
 #define radperstep 0,05026548
 
 uint32_t distance(void){ //function for the distance sensor
-
+    return 
 }
 
 int color(void){ //function for color sensor
