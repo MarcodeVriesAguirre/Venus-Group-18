@@ -6,9 +6,6 @@
 #define gridSize 150
 #define blockSize 3
 
-bool IsItJulius; //Julius is yes,no is Javier
-int turn; //side its turning
-
 robpos global_state = {0, 0, 1, PTHREAD_MUTEX_INITIALIZER};
 
 void posup(int distance){ //function for updating x and y coordinates
@@ -20,7 +17,7 @@ void posup(int distance){ //function for updating x and y coordinates
         case 3: global_state.y -= distance; break; //south
         case 4: global_state.x -= distance; break; //west
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
 void dirup(int turn){ //function for updating the direction
@@ -28,20 +25,19 @@ void dirup(int turn){ //function for updating the direction
     pthread_mutex_lock(&global_state.lock);
     //turn=1 for right
     //turn=-1 for left
-    if (global_state.dir==4 && turn==1){
-        global_state.dir = 1;
-    } else if (global_state.dir==1 && turn==-1){
-        global_state.dir = 4;
+    if (state->dir==4 && turn==1){
+        state->dir = 1;
+    } else if (state->dir==1 && turn==-1){
+        state->dir = 4;
     } else {
-        global_state.dir = (global_state.dir + turn);
+        state->dir = (state->dir + turn);
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
-void stop()
+void colorstop() //start moving and stop after color sensor send info
 {
-    //start moving and stop after color sensor send info
-        while(1/*nothing infront && color not black*/)
+        while(1/*no info is sent from color sensor*/)
         {
             //move forward
         }
@@ -49,15 +45,14 @@ void stop()
     //make sensors take info
 }
 
-void walkaound()
+void walkaound() // maybe obstacle and 
 {
+
+
     //turn 90 deg.
-
     //walk a bit
-
     //turn and check if it's still there
-
-    //if no continue PREROOMBA, if yes loop
+    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
 }
 
 void createMap(void)
@@ -93,15 +88,21 @@ int main()
     //main while - stops after all blocks are seen
     while(blocks < 5)
     {
-        //PREROOMBA - Get to corner
-        while(1/*Get to corner - when distance between */)
+        //get to the corners to start ROOMBA - PREROOMBA
+        while(1/*PREROOMBA*/)
         {
             //walk forward
-            stop();
+            colorstop();
             walkaround();
         }
 
-        //ROOMBA - Sweep
+        //send it to mapping
+        sendmap();
+    
+        //turn 90 deg. left for the left one and right for the right one
+    
+        //walk a bit forward and check 
+        
     }
     return 0;
 }

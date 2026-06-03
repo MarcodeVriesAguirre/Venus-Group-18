@@ -1,20 +1,171 @@
-#include <pthread.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
+[20.05.2026 16:39] Jegor: /*#include <libpynq.h>
+#include <platform.h>
+#include <stepper.h>
+
+
+void wait_until_done(void) {
+    while (!stepper_steps_done()) {
+        sleep_msec(50);
+    }
+}
+
+void set_speed(int *speed_ptr, int new_speed) {
+    *speed_ptr = new_speed;
+    stepper_set_speed(*speed_ptr, *speed_ptr);
+}
+
+void deceleration(int *speed_ptr){
+    int increase = 1000;
+    for (int s = *speed_ptr; s <= 18000; s += increase) {
+        set_speed(speed_ptr, s);
+        stepper_steps(400, 400);
+        sleep_msec(200);
+        increase = increase + 200;
+    }
+    wait_until_done();
+}
+
+void turn_left(void){
+
+    stepper_set_speed(20000, 20000);
+    stepper_steps(625, -625);
+
+    
+    wait_until_done();
+}
+
+void turn_right(void){
+
+    stepper_set_speed(20000, 20000);
+    stepper_steps(-625, 625);
+
+  
+    wait_until_done();
+}
+
+void spin(void){
+
+    stepper_set_speed(25000, 25000);
+    stepper_steps(2500, -2500);
+    wait_until_done();
+
+}
+void turn(void){
+
+    stepper_set_speed(25000, 25000);
+    stepper_steps(1250, -1250);
+    wait_until_done();
+
+}
+
+void look_around(void){
+
+    stepper_set_speed(30000, 30000);
+    stepper_steps(400, -400);
+    wait_until_done();
+
+    stepper_set_speed(30000, 30000);
+    stepper_steps(-800, 800);
+    wait_until_done();
+
+    stepper_set_speed(30000, 30000);
+    stepper_steps(400, -400);
+    wait_until_done();
+
+}
+
+void forward(int *speed_ptr, int steps){
+
+    stepper_set_speed(*speed_ptr, *speed_ptr);
+    stepper_steps(steps, steps);
+
+    
+}
+
+
+void obstacle(void){
+    int distance = 60;
+    turn_left();
+    look_around();
+
+    if(distance >> 30){
+        while(1){
+            forward(15000, 400);
+            turn_right();
+
+            if(distance >> 30){
+                return;
+            }
+            turn_left();
+        }
+    }
+
+    if(distance << 30){
+        turn();
+        if(distance >> 30){
+            while(1){
+                forward(15000, 400);
+                turn_left();
+
+                if(distance >> 30){
+                    return;
+                }
+                turn_right();
+            }
+        }
+        if(distance << 30){
+            turn_right();
+            return;
+        }
+    }
+}
+
+
+int main(void) {
+
+    
+
+    pynq_init();
+    
+    stepper_init();
+    stepper_enable();
+
+   int speed =15000;
+    
+    int a = 0;
+    while(a < 5){
+
+    
+    for(int i =0; i < 6; i++){
+        forward(&speed, 1600);
+        a = a+1;
+    }
+
+    } 
+    while(1){
+    stepper_set_speed(speed, speed);
+    stepper_steps(400, 400);
+    
+    }
+    
+
+    stepper_destroy();
+    pynq_destroy();
+
+    return 0;
+}
+*/
+
 #include <libpynq.h>
-#include "shared.h"
-#include <stdbool.h>
+#include <stdio.h>
 #include <stdint.h>
-#include <string.h>
-#include <sys/select.h>
+#include <stdbool.h>
+#include <time.h>
+#include <unistd.h>
+#include <platform.h>
+#include <stepper.h>
 
-#define MAX_LEN 200
 
-#define gridSize 150
-#define blockSize 3
-#define moveperstep 0.13744
-#define radperstep 0.02513274
 
 #define PIN_S0   IO_AR4
 #define PIN_S1   IO_AR5
@@ -74,7 +225,9 @@ typedef struct {
     color_t color;
 } color_result_t;
 
-static uint64_t now_us(void) {
+/* Shared result variable for other submodules */
+color_result_t latest_color_result;
+[20.05.2026 16:39] Jegor: static uint64_t now_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)(ts.tv_nsec / 1000ULL);
@@ -208,7 +361,7 @@ static rgb_t raw_to_rgb(raw_reading_t d) {
 
 /* Same color logic as before, now returning an enum */
 static color_t guess_color(raw_reading_t raw, rgb_t rgb) {
-    if (raw.red_us == 0 || raw.green_us == 0 || raw.blue_us == 0 || raw.clear_us == 0) {
+    if (raw.red_us == 0  raw.green_us == 0  raw.blue_us == 0 || raw.clear_us == 0) {
         return COLOR_UNKNOWN;
     }
 
@@ -231,8 +384,7 @@ static color_t guess_color(raw_reading_t raw, rgb_t rgb) {
     if (max_rgb > 140 && min_rgb > 90 && (max_rgb - min_rgb) < 90) {
         return COLOR_WHITE;
     }
-
-    /* Smaller pulse width = stronger response */
+[20.05.2026 16:39] Jegor: /* Smaller pulse width = stronger response */
     if (raw.red_us + RAW_DOM_MARGIN_US < raw.green_us &&
         raw.red_us + RAW_DOM_MARGIN_US < raw.blue_us) {
         return COLOR_RED;
@@ -298,189 +450,55 @@ color_result_t color_sensor_read(void) {
     return result;
 }
 
-uint32_t distance(void){ //function for the distance sensor
-    return 
-}
-
-int color(void){ //function for color sensor
-
-}
-
-int temperature(void){ //function for temperature sensor
-
-}
-
-int infrared(void){ //function for infrared sensor
-
-}
-
-void posup(float *pos, float *angle){ //function for updating x and y coordinates
-    pos[1]+=moveperstep*cos(*angle);
-    printf("Coordinates: (%f, %f)", pos[1], pos[2]);
-}
-
-void dirup(float *angle, int rightorleft){ //function for updating the direction
-    if (rightorleft==0){ //left
-        angle+=radperstep;
-    } else { //right
-        angle-=radperstep;
-    }
-    printf("Angle: %f", angle);
-}
-
-void createMap(void)
-{
-    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
-    // the created map needs to be double the size of the theoretical map
-    int grid[gridSize/blockSize][gridSize/blockSize]={0};
-}
-
-void sendmap(int xcell, int ycell) 
-{
-    static int uart_ready = 0;
-
-    if (!uart_ready)
-    {
-        switchbox_set_pin(IO_AR0, SWB_UART0_RX);
-        switchbox_set_pin(IO_AR1, SWB_UART0_TX);
-
-        uart_init(UART0);
-        uart_reset_fifos(UART0);
-
-        uart_ready = 1;
-    }
-
-    char message[100];
-    snprintf(message, sizeof(message), "XCELL=%d;YCELL=%d", xcell, ycell);
-
-    char buffer[200];
-    snprintf(buffer, sizeof(buffer), "%s\n", message);
-
-    uint32_t len = strlen(buffer);
-
-    uart_send(UART0, (len) & 0xFF);
-    uart_send(UART0, (len >> 8) & 0xFF);
-    uart_send(UART0, (len >> 16) & 0xFF);
-    uart_send(UART0, (len >> 24) & 0xFF);
-
-    for (uint32_t i = 0; i < len; i++)
-    {
-        uart_send(UART0, buffer[i]);
-    }
-
-    fprintf(stderr, "Sent map: %s", buffer);
-    fflush(stderr);
-}
-
-void detectCell(color, width)
-{
-
-}
-char detection_cube(float *angle){
-int steps_left;
-int left_side;
-int size;
-char kube;
-float angle_L;
-float angle_R;
-float angle_T;
-char color;
-if(distance << 30){
-    wait_until_done();
-    latest_color_result = color_sensor_read();
-    if(latest_color_result.color == COLOR_WHITE){
-        color = W;
-    }
-    if(latest_color_result.color == COLOR_BLACK){
-        color = B;
-    }
-    if(latest_color_result.color == COLOR_BLUE){
-        color = b;
-    }
-    if(latest_color_result.color == COLOR_GREEN){
-        color = G;
-    }
-    if(latest_color_result.color == COLOR_RED){
-        color = R;
-    }
-    
-    while(distance << 70){
-        stepper_set_speed(speed, speed);
-        stepper_steps(10, -10);
-        steps_left = steps_left + 10;
-        left_side = distance;
-        dirup(*angle, 0);
-    }
-    wait_until_done();
-    angle_L = *angle;
-
-    while(distance << 75){
-        stepper_set_speed(speed, speed);
-        stepper_steps(-steps_left, steps_left);
-        right_side = distance;
-        dirup(*angle, 1);
-    }
-    wait_until_done();
-    angle_R = *angle;
-
-    angle_T = angle_R - angle_L;
-    size = sqrt(pow(left_side, 2) + pow(right_side, 2) - 2 * left_side * right_side * cos(angle_T));
-
-    if(size >> 43){
-        if(color == R){
-            kube = R;
-            return kube;
-        }
-        if(color == W){
-            kube = W;
-            return kube;
-        }
-        if(color == G){
-            kube = G;
-            return kube;
-        }
-        if(color == R){
-            kube = R;
-            return kube;
-        }
-        if(color == B){
-            kube = B;
-            return kube;
-        }
-        if(color == b){
-            kube = E;
-            return kube;
-        }
-    }
-    else{
-        if(color == R){
-            cube = r;
-            return kube;
-        }
-        if(color == W){
-            kube = w;
-            return kube;
-        }
-        if(color == G){
-            kube = g;
-            return kube;
-        }
-        if(color == R){
-            kube = r;
-            return kube;
-        }
-        if(color == B){
-            kube = b;
-            return kube;
-        }
-        if(color == b){
-            kube = e;
-            return kube;
-        }
+void wait_until_done(void) {
+    while (!stepper_steps_done()) {
+        sleep_msec(50);
     }
 }
-}
 
-int main(){
+int main(void) {
+    pynq_init();
+    stepper_init();
+    stepper_enable();
+    printf("Starting TCS3200 program...\n");
+    fflush(stdout);
+
+    int speed =3075;
+
     color_sensor_init();
+
+    printf("TCS3200 test started\n");
+    printf("Pins: S0=AR4 S1=AR5 S2=AR6 S3=AR7 OUT=AR8\n");
+    printf("20%% scaling, OE tied to GND\n");
+    printf("NO_OBJECT threshold (clear): %d us\n", NO_OBJECT_CLEAR_US);
+    printf("RAW dominance margin: %d us\n\n", RAW_DOM_MARGIN_US);
+    fflush(stdout);
+
+    while (1) {
+        latest_color_result = color_sensor_read();
+
+
+        fflush(stdout);
+
+        stepper_set_speed(speed, speed);
+        stepper_steps(10, 10);
+        
+        if(latest_color_result.color != COLOR_WHITE && latest_color_result.color != COLOR_UNKNOWN){
+            wait_until_done();
+            stepper_set_speed(10000, 10000);
+            stepper_steps(0, -1250);
+            wait_until_done();
+            break;
+        }
+            
+    
+    }
+
+    stepper_destroy();
+    pynq_destroy();
+    return 0;
 }
+
+
+
+
