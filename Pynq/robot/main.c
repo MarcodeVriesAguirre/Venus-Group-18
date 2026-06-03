@@ -479,7 +479,7 @@ if(distance << 30){
         }
     }
 }
-printf( %c), &cube;
+printf(" %c", &cube);
 }
 
 int main(){
