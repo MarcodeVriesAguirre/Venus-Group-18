@@ -1,97 +1,108 @@
 #include "shared.h"
 #include <stdio.h>
-#include <stdbool.h>
 #include <unistd.h>
-#include <libpynq.h>
-#include <stepper.h>
-#include <iic.h>
-#include "vl53l0x.h"
+#include "movement.c"
 
-#define TOF_ADDR 0x29
-#define STOP_DISTANCE_MM 50  // 5 cm
-#define NORMAL_SPEED 12000
-
-vl53x tof_sensor;
+#define gridSize 150
+#define blockSize 3
 
 robpos global_state = {0, 0, 1, PTHREAD_MUTEX_INITIALIZER};
 
-uint32_t distance(void) {
-    return tofReadDistance(&tof_sensor);
-}
-
-int infrared(void) {
-    return 0;  // TODO: wire up IR sensor
-}
-
-void posup(int d) {
+void posup(int distance){ //function for updating x and y coordinates
+    //This function are called in movement file when told to move forwards or backwards
     pthread_mutex_lock(&global_state.lock);
-    switch (global_state.dir) {
-        case 1: global_state.y += d; break;  // north
-        case 2: global_state.x += d; break;  // east
-        case 3: global_state.y -= d; break;  // south
-        case 4: global_state.x -= d; break;  // west
+    switch(global_state.dir){
+        case 1: global_state.y += distance; break; //north 
+        case 2: global_state.x += distance; break; //east
+        case 3: global_state.y -= distance; break; //south
+        case 4: global_state.x -= distance; break; //west
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
-void dirup(int turn) {
+void dirup(int turn){ //function for updating the direction
+    //This function are called in movement file when told to turn left or right
     pthread_mutex_lock(&global_state.lock);
-    // turn=1 right, turn=-1 left
-    if (global_state.dir == 4 && turn == 1) {
-        global_state.dir = 1;
-    } else if (global_state.dir == 1 && turn == -1) {
-        global_state.dir = 4;
+    //turn=1 for right
+    //turn=-1 for left
+    if (state->dir==4 && turn==1){
+        state->dir = 1;
+    } else if (state->dir==1 && turn==-1){
+        state->dir = 4;
     } else {
-        global_state.dir += turn;
+        state->dir = (state->dir + turn);
     }
-    pthread_mutex_unlock(&global_state.lock);
+    pthread_mutex_unlock(&state->lock);
 }
 
-static void wait_until_done(void) {
-    while (!stepper_steps_done()) {
-        sleep_msec(50);
-    }
-}
-
-static void forward(uint16_t speed, int steps) {
-    stepper_set_speed(speed, speed);
-    stepper_steps(steps, steps);
-    wait_until_done();
-    posup((steps / 1600) * 7);
-}
-
-int main(void) {
-    pynq_init();
-    stepper_init();
-    stepper_enable();
-
-    switchbox_set_pin(IO_AR_SCL, SWB_IIC0_SCL);
-    switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
-    iic_init(IIC0);
-
-    if (tofPing(IIC0, TOF_ADDR) != 0) {
-        printf("VL53L0X ping failed\n");
-        return 1;
-    }
-    if (tofInit(&tof_sensor, IIC0, TOF_ADDR, 0) != 0) {
-        printf("VL53L0X init failed\n");
-        return 1;
-    }
-
-    while (1) {
-        uint32_t d = distance();
-        printf("distance=%u mm\n", d);
-        if (d <= STOP_DISTANCE_MM || infrared()) {
-            print "obstacle detected, stopping\n");
-        } else {
-            forward(NORMAL_SPEED, 200);
+void colorstop() //start moving and stop after color sensor send info
+{
+        while(1/*no info is sent from color sensor*/)
+        {
+            //move forward
         }
+
+    //make sensors take info
+}
+
+void walkaound() // maybe obstacle and 
+{
+
+
+    //turn 90 deg.
+    //walk a bit
+    //turn and check if it's still there
+    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
+}
+
+void createMap(void)
+{
+    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
+    // the created map needs to be double the size of the theoretical map
+    int grid[gridSize/blockSize][gridSize/blockSize]={0};
+}
+
+int coordTranslate(pos)
+{
+    //The grid is represented as a matrix with dimensions [gridSize/blockSize]x[gridSize/blockSize]
+    //and the 0, 0 isn't going to be 0, 0 on the matrix. coordinates therefore need to be translated.
+    int realPos; //this is the position translated to the matrix.
+    realPos=pos+(gridSize/blockSize);
+}
+
+void updateMap(color, distance)
+{
+    
+}
+
+void sendmap()
+{
+
+
+}
+
+int main()
+{
+    int blocks = 0;
+
+    //main while - stops after all blocks are seen
+    while(blocks < 5)
+    {
+        //get to the corners to start ROOMBA - PREROOMBA
+        while(1/*PREROOMBA*/)
+        {
+            //walk forward
+            colorstop();
+            walkaround();
+        }
+
+        //send it to mapping
+        sendmap();
+    
+        //turn 90 deg. left for the left one and right for the right one
+    
+        //walk a bit forward and check 
         
     }
-
-    printf("stopped\n");
-    iic_destroy(IIC0);
-    stepper_destroy();
-    pynq_destroy();
     return 0;
 }
