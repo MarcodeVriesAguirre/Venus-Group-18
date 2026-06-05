@@ -7,6 +7,7 @@
 #include <libpynq.h>
 #include <stepper.h>
 #include <iic.h>
+#include <sys/select.h>
 #include "vl53l0x.h"
 
 /* ---------- distance sensor ---------- */
@@ -28,6 +29,14 @@ vl53x tof_sensor;
 #define PIN_S2   IO_AR6
 #define PIN_S3   IO_AR7
 #define PIN_OUT  IO_AR8
+
+/* ---------- mapping ---------- */
+#define MAX_LEN 200
+
+#define gridSize 150
+#define blockSize 3
+#define moveperstep 0.13744
+#define radperstep 0.02513274
 
 /* ---------- infrared line sensor (digital, from Infrared/main.c) ---------- */
 #define PIN_IR          IO_AR9
@@ -324,6 +333,175 @@ void turn_left_90(void) {
 /* drive forward a given distance in centimeters */
 void forward_cm(int cm) {
     forward(DRIVE_SPEED, cm * STEPS_PER_CM);
+}
+
+/* ---------- mapping ---------- */
+
+void posup(float *pos, float *angle){ //function for updating x and y coordinates
+    pos[1]+=moveperstep*cos(*angle);
+    printf("Coordinates: (%f, %f)", pos[1], pos[2]);
+}
+
+void dirup(float *angle, int rightorleft){ //function for updating the direction
+    if (rightorleft==0){ //left
+        angle+=radperstep;
+    } else { //right
+        angle-=radperstep;
+    }
+    printf("Angle: %f", angle);
+}
+
+void createMap(void)
+{
+    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
+    // the created map needs to be double the size of the theoretical map
+    int grid[gridSize/blockSize][gridSize/blockSize]={0};
+}
+
+void sendmap(int xcell, int ycell) 
+{
+    static int uart_ready = 0;
+
+    if (!uart_ready)
+    {
+        switchbox_set_pin(IO_AR0, SWB_UART0_RX);
+        switchbox_set_pin(IO_AR1, SWB_UART0_TX);
+
+        uart_init(UART0);
+        uart_reset_fifos(UART0);
+
+        uart_ready = 1;
+    }
+
+    char message[100];
+    snprintf(message, sizeof(message), "XCELL=%d;YCELL=%d", xcell, ycell);
+
+    char buffer[200];
+    snprintf(buffer, sizeof(buffer), "%s\n", message);
+
+    uint32_t len = strlen(buffer);
+
+    uart_send(UART0, (len) & 0xFF);
+    uart_send(UART0, (len >> 8) & 0xFF);
+    uart_send(UART0, (len >> 16) & 0xFF);
+    uart_send(UART0, (len >> 24) & 0xFF);
+
+    for (uint32_t i = 0; i < len; i++)
+    {
+        uart_send(UART0, buffer[i]);
+    }
+
+    fprintf(stderr, "Sent map: %s", buffer);
+    fflush(stderr);
+}
+
+void detectCell(color, width)
+{
+
+}
+char detection_cube(float *angle){
+int steps_left;
+int left_side;
+int size;
+char kube;
+float angle_L;
+float angle_R;
+float angle_T;
+char color;
+if(distance << 30){
+    wait_until_done();
+    latest_color_result = color_sensor_read();
+    if(latest_color_result.color == COLOR_WHITE){
+        color = W;
+    }
+    if(latest_color_result.color == COLOR_BLACK){
+        color = B;
+    }
+    if(latest_color_result.color == COLOR_BLUE){
+        color = b;
+    }
+    if(latest_color_result.color == COLOR_GREEN){
+        color = G;
+    }
+    if(latest_color_result.color == COLOR_RED){
+        color = R;
+    }
+    
+    while(distance << 70){
+        stepper_set_speed(speed, speed);
+        stepper_steps(10, -10);
+        steps_left = steps_left + 10;
+        left_side = distance;
+        dirup(*angle, 0);
+    }
+    wait_until_done();
+    angle_L = *angle;
+
+    while(distance << 75){
+        stepper_set_speed(speed, speed);
+        stepper_steps(-steps_left, steps_left);
+        right_side = distance;
+        dirup(*angle, 1);
+    }
+    wait_until_done();
+    angle_R = *angle;
+
+    angle_T = angle_R - angle_L;
+    size = sqrt(pow(left_side, 2) + pow(right_side, 2) - 2 * left_side * right_side * cos(angle_T));
+
+    if(size >> 43){
+        if(color == R){
+            kube = R;
+            return kube;
+        }
+        if(color == W){
+            kube = W;
+            return kube;
+        }
+        if(color == G){
+            kube = G;
+            return kube;
+        }
+        if(color == R){
+            kube = R;
+            return kube;
+        }
+        if(color == B){
+            kube = B;
+            return kube;
+        }
+        if(color == b){
+            kube = E;
+            return kube;
+        }
+    }
+    else{
+        if(color == R){
+            cube = r;
+            return kube;
+        }
+        if(color == W){
+            kube = w;
+            return kube;
+        }
+        if(color == G){
+            kube = g;
+            return kube;
+        }
+        if(color == R){
+            kube = r;
+            return kube;
+        }
+        if(color == B){
+            kube = b;
+            return kube;
+        }
+        if(color == b){
+            kube = e;
+            return kube;
+        }
+    }
+}
 }
 
 /* ---------- main ---------- */
