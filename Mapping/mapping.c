@@ -1,4 +1,4 @@
-#include "raylib.h"
+#include <raylib.h>
 #include <math.h>
 
 #define DEG2RAD (3.14159265358979323846f / 180.0f)
