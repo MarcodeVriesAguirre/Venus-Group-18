@@ -284,20 +284,19 @@ void posup(int d) {
         case 3: global_state.y -= d; break;
         case 4: global_state.x -= d; break;
     }
-    pthread_mutex_unlock(&state->lock);
+    pthread_mutex_unlock(&global_state.lock);
 }
 
-void dirup(int turn){ //function for updating the direction
-    //This function are called in movement file when told to turn left or right
+void dirup(int turn) {
     pthread_mutex_lock(&global_state.lock);
     if (global_state.dir == 4 && turn == 1) {
         global_state.dir = 1;
     } else if (global_state.dir == 1 && turn == -1) {
         global_state.dir = 4;
     } else {
-        state->dir = (state->dir + turn);
+        global_state.dir += turn;
     }
-    pthread_mutex_unlock(&state->lock);
+    pthread_mutex_unlock(&global_state.lock);
 }
 
 /* ---------- movement helpers ---------- */
@@ -361,67 +360,6 @@ int main(void) {
             turn_left_90();          // turn 90 deg left again
             continue;                // resume driving forward
         }
-
-    //make sensors take info
-}
-
-void walkaound() // maybe obstacle and 
-{
-
-
-    //turn 90 deg.
-    //walk a bit
-    //turn and check if it's still there
-    //WHAT DO I MEAN //if no continue PREROOMBA, if yes loop
-}
-
-void createMap(void)
-{
-    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
-    // the created map needs to be double the size of the theoretical map
-    int grid[gridSize/blockSize][gridSize/blockSize]={0};
-}
-
-int coordTranslate(pos)
-{
-    //The grid is represented as a matrix with dimensions [gridSize/blockSize]x[gridSize/blockSize]
-    //and the 0, 0 isn't going to be 0, 0 on the matrix. coordinates therefore need to be translated.
-    int realPos; //this is the position translated to the matrix.
-    realPos=pos+(gridSize/blockSize);
-}
-
-void updateMap(color, distance)
-{
-    
-}
-
-void sendmap()
-{
-
-
-}
-
-int main()
-{
-    int blocks = 0;
-
-    //main while - stops after all blocks are seen
-    while(blocks < 5)
-    {
-        //get to the corners to start ROOMBA - PREROOMBA
-        while(1/*PREROOMBA*/)
-        {
-            //walk forward
-            colorstop();
-            walkaround();
-        }
-
-        //send it to mapping
-        sendmap();
-    
-        //turn 90 deg. left for the left one and right for the right one
-    
-        //walk a bit forward and check 
         
         if (getDistance() < STOP_DISTANCE_MM) {   // safety: obstacle ahead
             wait_until_done();
