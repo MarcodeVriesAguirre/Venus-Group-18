@@ -8,11 +8,12 @@
 #include <stepper.h>
 #include <iic.h>
 #include <sys/select.h>
+#include <math.h>
 #include "vl53l0x.h"
 
 /* ---------- distance sensor ---------- */
 #define TOF_ADDR 0x29
-#define STOP_DISTANCE_MM 50
+#define STOP_DISTANCE_MM 40
 #define NORMAL_SPEED 12000
 
 /* ---------- turn / drive calibration ---------- */
@@ -284,30 +285,6 @@ int infrared(void) {
     return gpio_get_level(PIN_IR) == IR_BLACK_LEVEL;  // 1 = black, 0 = not black
 }
 
-/* ---------- pose updates ---------- */
-void posup(int d) {
-    pthread_mutex_lock(&global_state.lock);
-    switch (global_state.dir) {
-        case 1: global_state.y += d; break;
-        case 2: global_state.x += d; break;
-        case 3: global_state.y -= d; break;
-        case 4: global_state.x -= d; break;
-    }
-    pthread_mutex_unlock(&global_state.lock);
-}
-
-void dirup(int turn) {
-    pthread_mutex_lock(&global_state.lock);
-    if (global_state.dir == 4 && turn == 1) {
-        global_state.dir = 1;
-    } else if (global_state.dir == 1 && turn == -1) {
-        global_state.dir = 4;
-    } else {
-        global_state.dir += turn;
-    }
-    pthread_mutex_unlock(&global_state.lock);
-}
-
 /* ---------- movement helpers ---------- */
 static void wait_until_done(void) {
     while (!stepper_steps_done()) {
@@ -319,7 +296,6 @@ void forward(uint16_t speed, int steps) {
     stepper_set_speed(speed, speed);
     stepper_steps(steps, steps);
     wait_until_done();
-    posup((steps / 1600) * 7);
 }
 
 /* turn 90 degrees to the left in place (left wheel +, right wheel -) */
@@ -327,7 +303,6 @@ void turn_left_90(void) {
     stepper_set_speed(TURN_SPEED, TURN_SPEED);
     stepper_steps(STEPS_90, -STEPS_90);
     wait_until_done();
-    dirup(-1);
 }
 
 /* drive forward a given distance in centimeters */
@@ -344,18 +319,18 @@ void posup(float *pos, float *angle){ //function for updating x and y coordinate
 
 void dirup(float *angle, int rightorleft){ //function for updating the direction
     if (rightorleft==0){ //left
-        angle+=radperstep;
+        *angle+=radperstep;
     } else { //right
-        angle-=radperstep;
+        *angle-=radperstep;
     }
-    printf("Angle: %f", angle);
+    printf("Angle: %f", *angle);
 }
 
 void createMap(void)
 {
     //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
     // the created map needs to be double the size of the theoretical map
-    int grid[gridSize/blockSize][gridSize/blockSize]={0};
+    // int grid[gridSize/blockSize][gridSize/blockSize]={0};
 }
 
 void sendmap(int xcell, int ycell) 
@@ -395,53 +370,63 @@ void sendmap(int xcell, int ycell)
     fflush(stderr);
 }
 
-void detectCell(color, width)
-{
-
-}
 char detection_cube(float *angle){
 int steps_left;
 int left_side;
+int right_side;
 int size;
 char kube;
 float angle_L;
 float angle_R;
 float angle_T;
 char color;
-if(distance << 30){
-    wait_until_done();
+int speed=3075;
+printf("detecting\n");
+if(getDistance() < 45){
+    //wait_until_done();
     latest_color_result = color_sensor_read();
     if(latest_color_result.color == COLOR_WHITE){
-        color = W;
+        color = 'W';
     }
     if(latest_color_result.color == COLOR_BLACK){
-        color = B;
+        color = 'B';
     }
     if(latest_color_result.color == COLOR_BLUE){
-        color = b;
+        color = 'b';
     }
     if(latest_color_result.color == COLOR_GREEN){
-        color = G;
+        color = 'G';
     }
     if(latest_color_result.color == COLOR_RED){
-        color = R;
+        color = 'R';
     }
     
-    while(distance << 70){
+    while(getDistance() < 60){
         stepper_set_speed(speed, speed);
         stepper_steps(10, -10);
+        printf("dist: %d\n", getDistance());
         steps_left = steps_left + 10;
-        left_side = distance;
-        dirup(*angle, 0);
+        left_side = getDistance();
+        dirup(angle, 0);
     }
     wait_until_done();
+    printf("idk\n");
     angle_L = *angle;
+    stepper_steps(-10, 10);
+    dirup(angle, 1);
+    wait_until_done();
+    stepper_steps(-10, 10);
+    dirup(angle, 1);
+    wait_until_done();
+    stepper_steps(-10, 10);
+    dirup(angle, 1);
+    wait_until_done();
 
-    while(distance << 75){
+    while(getDistance() < 60){
         stepper_set_speed(speed, speed);
-        stepper_steps(-steps_left, steps_left);
-        right_side = distance;
-        dirup(*angle, 1);
+        stepper_steps(-10, 10);
+        right_side = getDistance();
+        dirup(angle, 1);
     }
     wait_until_done();
     angle_R = *angle;
@@ -449,59 +434,60 @@ if(distance << 30){
     angle_T = angle_R - angle_L;
     size = sqrt(pow(left_side, 2) + pow(right_side, 2) - 2 * left_side * right_side * cos(angle_T));
 
-    if(size >> 43){
-        if(color == R){
-            kube = R;
+    if(size > 43){
+        if(color == 'R'){
+            kube = 'R';
             return kube;
         }
-        if(color == W){
-            kube = W;
+        if(color == 'W'){
+            kube = 'W';
             return kube;
         }
-        if(color == G){
-            kube = G;
+        if(color == 'G'){
+            kube = 'G';
             return kube;
         }
-        if(color == R){
-            kube = R;
+        if(color == 'R'){
+            kube = 'R';
             return kube;
         }
-        if(color == B){
-            kube = B;
+        if(color == 'B'){
+            kube = 'B';
             return kube;
         }
-        if(color == b){
-            kube = E;
+        if(color == 'b'){
+            kube = 'E';
             return kube;
         }
     }
     else{
-        if(color == R){
-            cube = r;
+        if(color == 'R'){
+            kube = 'r';
             return kube;
         }
-        if(color == W){
-            kube = w;
+        if(color == 'W'){
+            kube = 'w';
             return kube;
         }
-        if(color == G){
-            kube = g;
+        if(color == 'G'){
+            kube = 'g';
             return kube;
         }
-        if(color == R){
-            kube = r;
+        if(color == 'R'){
+            kube = 'r';
             return kube;
         }
-        if(color == B){
-            kube = b;
+        if(color == 'B'){
+            kube = 'b';
             return kube;
         }
-        if(color == b){
-            kube = e;
+        if(color == 'b'){
+            kube = 'e';
             return kube;
         }
     }
 }
+return 'g';
 }
 
 /* ---------- main ---------- */
@@ -509,6 +495,9 @@ int main(void) {
     pynq_init();
     stepper_init();
     stepper_enable();
+    float angle_first=0.0;
+    float *angle=&angle_first;
+    char cube;
 
     setbuf(stdout, NULL);
     color_sensor_init();
@@ -541,7 +530,8 @@ int main(void) {
         
         if (getDistance() < STOP_DISTANCE_MM) {   // safety: obstacle ahead
             wait_until_done();
-            printf("obstacle detected, stopped\n");
+            cube = detection_cube(angle);
+            printf("obstacle detected(%c), stopped\n", cube);
             break;
         }
     }
