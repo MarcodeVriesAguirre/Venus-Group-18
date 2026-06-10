@@ -337,9 +337,19 @@ void dirup(int x, int y, float *angle){ //function for updating the direction
     printf("Angle: %f", *angle);
 }
 
-void sendmap(int xcell, int ycell) //(float *pos, char thing)
+void sendmap(int *position, char *input) 
 {
     static int uart_ready = 0;
+
+    if (position == NULL || input == NULL)
+    {
+        fprintf(stderr, "sendmap error: NULL pointer\n");
+        return;
+    }
+
+    int xcell = position[0];
+    int ycell = position[1];
+    char block_char = *input;
 
     if (!uart_ready)
     {
@@ -352,15 +362,26 @@ void sendmap(int xcell, int ycell) //(float *pos, char thing)
         uart_ready = 1;
     }
 
-    char message[100];
-    snprintf(message, sizeof(message), "XCELL=%d;YCELL=%d", xcell, ycell);
-
     char buffer[200];
-    snprintf(buffer, sizeof(buffer), "%s\n", message);
+
+    /*
+       MQTT payload.
+       This sends xcell, ycell, and the char input.
+       Example:
+       {"xcell":4,"ycell":7,"input":"R"}
+    */
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "{\"xcell\":%d,\"ycell\":%d,\"input\":\"%c\"}\n",
+        xcell,
+        ycell,
+        block_char
+    );
 
     uint32_t len = strlen(buffer);
 
-    uart_send(UART0, (len) & 0xFF);
+    uart_send(UART0, len & 0xFF);
     uart_send(UART0, (len >> 8) & 0xFF);
     uart_send(UART0, (len >> 16) & 0xFF);
     uart_send(UART0, (len >> 24) & 0xFF);
@@ -370,7 +391,7 @@ void sendmap(int xcell, int ycell) //(float *pos, char thing)
         uart_send(UART0, buffer[i]);
     }
 
-    fprintf(stderr, "Sent map: %s", buffer);
+    fprintf(stderr, "Sent map MQTT payload: %s", buffer);
     fflush(stderr);
 }
 
