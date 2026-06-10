@@ -292,9 +292,9 @@ static void wait_until_done(void) {
     }
 }
 
-void forward(uint16_t speed, int steps) {
+void forward(uint16_t speed, int steps, float *pos, float *angle) {
     stepper_set_speed(speed, speed);
-    stepper_steps(steps, steps);
+    stepper_steps_pos(steps, pos, angle);
     wait_until_done();
 }
 
@@ -306,15 +306,21 @@ void turn_left_90(void) {
 }
 
 /* drive forward a given distance in centimeters */
-void forward_cm(int cm) {
+void forward_cm(int cm, float *pos, float *angle) {
     forward(DRIVE_SPEED, cm * STEPS_PER_CM);
+}
+
+void stepper_steps_pos(int x, float *pos, float *angle) {
+    stepper_steps(x, x);
+    posup(x, pos, angle);
 }
 
 /* ---------- mapping ---------- */
 
-void posup(float *pos, float *angle){ //function for updating x and y coordinates
-    pos[1]+=moveperstep*cos(*angle);
-    printf("Coordinates: (%f, %f)", pos[1], pos[2]);
+void posup(int steps, float *pos, float *angle){ //function for updating x and y coordinates
+    pos[0]+=(1/STEPS_PER_CM)*steps*cos(*angle);
+    pos[1]+=(1/STEPS_PER_CM)*steps*sin(*angle);
+    printf("Coordinates: (%f, %f)", pos[0], pos[1]);
 }
 
 void dirup(float *angle, int rightorleft){ //function for updating the direction
