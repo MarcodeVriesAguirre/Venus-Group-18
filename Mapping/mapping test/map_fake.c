@@ -124,54 +124,56 @@ static bool try_connect(void)
 
 static void handle_message(const char* msg)
 {
-    // ── ROBOT ─────────────────────────────────────────────────────────────────
-    if (strncmp(msg, "ROBOT,", 6) == 0) {
-        int   id;
-        float x, y, heading;
-        if (sscanf(msg, "ROBOT,%d,%f,%f,%f", &id, &x, &y, &heading) == 4) {
-            if (id >= 0 && id < MAX_ROBOTS) {
-                robots[id].id      = id;
-                robots[id].pos     = (Vector2){ x, y };
-                robots[id].heading = heading;
-                robots[id].active  = true;
-            }
-        }
+    if (strcmp(msg, "FRAME_START") == 0)
+    {
+        for (int i = 0; i < MAX_ROBOTS; i++) robots[i].active = false;
+        for (int i = 0; i < MAX_OBJECTS; i++) objects[i].active = false;
+        for (int i = 0; i < MAX_CLIFFS; i++) cliffs[i].active = false;
         return;
     }
 
-    // ── OBJECT ───────────────────────────────────────────────────────────────
-    if (strncmp(msg, "OBJECT,", 7) == 0) {
-        char  type[32];
+    if (strcmp(msg, "FRAME_END") == 0)
+        return;
+
+    if (msg[0] == 'R')
+    {
+        int id;
+        float x, y, h;
+        sscanf(msg, "R|%d|%f|%f|%f", &id, &x, &y, &h);
+        robots[id] = (Robot){ id, {x,y}, h, true };
+    }
+    else if (msg[0] == 'O')
+    {
+        char type[32];
         float x, y;
-        if (sscanf(msg, "OBJECT,%31[^,],%f,%f", type, &x, &y) == 3) {
-            for (int i = 0; i < MAX_OBJECTS; i++) {
-                if (!objects[i].active) {
-                    strncpy(objects[i].type, type, 31);
-                    objects[i].pos    = (Vector2){ x, y };
-                    objects[i].active = true;
-                    break;
-                }
+        sscanf(msg, "O|%31[^|]|%f|%f", type, &x, &y);
+
+        for (int i = 0; i < MAX_OBJECTS; i++)
+        {
+            if (!objects[i].active)
+            {
+                strcpy(objects[i].type, type);
+                objects[i].pos = (Vector2){x,y};
+                objects[i].active = true;
+                break;
             }
         }
-        return;
     }
-
-    // ── CLIFF ────────────────────────────────────────────────────────────────
-    if (strncmp(msg, "CLIFF,", 6) == 0) {
+    else if (msg[0] == 'C')
+    {
         float x, y;
-        if (sscanf(msg, "CLIFF,%f,%f", &x, &y) == 2) {
-            for (int i = 0; i < MAX_CLIFFS; i++) {
-                if (!cliffs[i].active) {
-                    cliffs[i].pos    = (Vector2){ x, y };
-                    cliffs[i].active = true;
-                    break;
-                }
+        sscanf(msg, "C|%f|%f", &x, &y);
+
+        for (int i = 0; i < MAX_CLIFFS; i++)
+        {
+            if (!cliffs[i].active)
+            {
+                cliffs[i].pos = (Vector2){x,y};
+                cliffs[i].active = true;
+                break;
             }
         }
-        return;
     }
-
-    TraceLog(LOG_WARNING, "TCP: unknown message: %s", msg);
 }
 
 /* Drain the TCP socket and dispatch complete newline-terminated messages. */
