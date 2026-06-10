@@ -337,14 +337,7 @@ void dirup(int x, int y, float *angle){ //function for updating the direction
     printf("Angle: %f", *angle);
 }
 
-void createMap(void)
-{
-    //Assumptions: The map is going to be 1.5x1.5 meters, each grid block will be 3cmx3cm.
-    // the created map needs to be double the size of the theoretical map
-    // int grid[gridSize/blockSize][gridSize/blockSize]={0};
-}
-
-void sendmap(int xcell, int ycell) 
+void sendmap(int xcell, int ycell) //(float *pos, char thing)
 {
     static int uart_ready = 0;
 
