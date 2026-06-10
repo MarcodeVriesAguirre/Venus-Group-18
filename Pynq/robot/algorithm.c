@@ -292,36 +292,47 @@ static void wait_until_done(void) {
     }
 }
 
-void forward(uint16_t speed, int steps) {
+void forward(uint16_t speed, int steps, float *pos, float *angle) {
     stepper_set_speed(speed, speed);
-    stepper_steps(steps, steps);
+    stepper_steps_pos(steps, pos, angle);
     wait_until_done();
 }
 
 /* turn 90 degrees to the left in place (left wheel +, right wheel -) */
-void turn_left_90(void) {
+void turn_left_90(float *angle) {
     stepper_set_speed(TURN_SPEED, TURN_SPEED);
-    stepper_steps(STEPS_90, -STEPS_90);
+    stepper_steps_dir(STEPS_90, -STEPS_90, angle);
     wait_until_done();
 }
 
 /* drive forward a given distance in centimeters */
-void forward_cm(int cm) {
+void forward_cm(int cm, float *pos, float *angle) {
     forward(DRIVE_SPEED, cm * STEPS_PER_CM);
+}
+
+void stepper_steps_pos(int x, float *pos, float *angle) {
+    stepper_steps(x, x);
+    posup(x, pos, angle);
+}
+
+void stepper_steps_dir(int x, int y, float *angle) {
+    stepper_steps(x, y);
+    dirup(x, y, angle);
 }
 
 /* ---------- mapping ---------- */
 
-void posup(float *pos, float *angle){ //function for updating x and y coordinates
-    pos[1]+=moveperstep*cos(*angle);
-    printf("Coordinates: (%f, %f)", pos[1], pos[2]);
+void posup(int steps, float *pos, float *angle){ //function for updating x and y coordinates
+    pos[0]+=(1/STEPS_PER_CM)*steps*cos(*angle);
+    pos[1]+=(1/STEPS_PER_CM)*steps*sin(*angle);
+    printf("Coordinates: (%f, %f)", pos[0], pos[1]);
 }
 
-void dirup(float *angle, int rightorleft){ //function for updating the direction
-    if (rightorleft==0){ //left
-        *angle+=radperstep;
+void dirup(int x, int y, float *angle){ //function for updating the direction
+    if (x>y){ //left
+        *angle+=radperstep*abs(x);
     } else { //right
-        *angle-=radperstep;
+        *angle-=radperstep*abs(x);
     }
     printf("Angle: %f", *angle);
 }
@@ -403,28 +414,24 @@ if(getDistance() < 45){
     
     while(getDistance() < 60){
         stepper_set_speed(speed, speed);
-        stepper_steps(10, -10);
+        stepper_steps_dir(10, -10, angle);
         printf("dist: %d\n", getDistance());
         steps_left = steps_left + 10;
         left_side = getDistance();
-        dirup(angle, 0);
     }
     wait_until_done();
     printf("idk\n");
     angle_L = *angle;
-    stepper_steps(-10, 10);
-    dirup(angle, 1);
+    stepper_steps_dir(-10, 10, angle);
     wait_until_done();
-    stepper_steps(-10, 10);
-    dirup(angle, 1);
+    stepper_steps_dir(-10, 10, angle);
     wait_until_done();
-    stepper_steps(-10, 10);
-    dirup(angle, 1);
+    stepper_steps_dir(-10, 10, angle);
     wait_until_done();
 
     while(getDistance() < 60){
         stepper_set_speed(speed, speed);
-        stepper_steps(-10, 10);
+        stepper_steps_dir(-10, 10, angle);
         right_side = getDistance();
         dirup(angle, 1);
     }
