@@ -35,10 +35,6 @@ def on_message(client, userdata, message):
         if 0 <= x < WIDTH and 0 <= y < HEIGHT:
             set_tile(x, y, rock_type[0])
 
-        #print(f"X: {x}")
-        #print(f"Y: {y}")
-        #print(f"Type: {rock_type}")
-
         draw_map()
 
     if parts[0] == "Mountain":
@@ -48,9 +44,6 @@ def on_message(client, userdata, message):
         if 0 <= x < WIDTH and 0 <= y < HEIGHT:
             set_tile(x, y, "M")
 
-        #print(f"X: {x}")
-        #print(f"Y: {y}")
-
         draw_map()
 
     if parts[0] == "Cliff":
@@ -59,9 +52,6 @@ def on_message(client, userdata, message):
 
         if 0 <= x < WIDTH and 0 <= y < HEIGHT:
             set_tile(x, y, "C")
-
-        #print(f"X: {x}")
-        #print(f"Y: {y}")
 
         draw_map()
 
