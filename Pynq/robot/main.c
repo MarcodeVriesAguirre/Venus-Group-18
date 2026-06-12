@@ -362,7 +362,7 @@ void sendmap(int *position, char *input)
 
     char buffer[200];
 
-    /*
+    /* w
        MQTT payload.
        This sends xcell, ycell, and the char input.
        Example:
