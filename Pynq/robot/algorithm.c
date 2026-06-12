@@ -255,6 +255,71 @@ color_result_t color_sensor_read(void) {
     return result;
 }
 
+void sendmap(int *position, char *input) 
+{
+    static int uart_ready = 0;
+
+    if (position == NULL || input == NULL)
+    {
+        fprintf(stderr, "sendmap error: NULL pointer\n");
+        return;
+    }
+
+    int xcell = position[0];
+    int ycell = position[1];
+    char block_char = *input;
+
+    if (!uart_ready)
+    {
+        switchbox_set_pin(IO_AR0, SWB_UART0_RX);
+        switchbox_set_pin(IO_AR1, SWB_UART0_TX);
+
+        uart_init(UART0);
+        uart_reset_fifos(UART0);
+
+        uart_ready = 1;
+    }
+
+    char buffer[200];
+
+    /* w
+       MQTT payload.
+       This sends xcell, ycell, and the char input.
+       Example:
+       {"xcell":4,"ycell":7,"input":"R"}
+    */
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "{\"xcell\":%d,\"ycell\":%d,\"input\":\"%c\"}\n",
+        xcell,
+        ycell,
+        block_char
+    );
+
+    uint32_t len = strlen(buffer);
+
+    uart_send(UART0, len & 0xFF);
+    uart_send(UART0, (len >> 8) & 0xFF);
+    uart_send(UART0, (len >> 16) & 0xFF);
+    uart_send(UART0, (len >> 24) & 0xFF);
+
+    for (uint32_t i = 0; i < len; i++)
+    {
+        uart_send(UART0, buffer[i]);
+    }
+
+    fprintf(stderr, "Sent map MQTT payload: %s", buffer);
+    fflush(stderr);
+}
+
+
+
+int main()
+{
+    int blocks = 0;
+
+
 bool distance_sensor_init(void) {
     switchbox_set_pin(IO_AR_SCL, SWB_IIC0_SCL);
     switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
@@ -337,9 +402,19 @@ void dirup(int x, int y, float *angle){ //function for updating the direction
     printf("Angle: %f", *angle);
 }
 
-void sendmap(int xcell, int ycell) //(float *pos, char thing)
+void sendmap(int *position, char *input) 
 {
     static int uart_ready = 0;
+
+    if (position == NULL || input == NULL)
+    {
+        fprintf(stderr, "sendmap error: NULL pointer\n");
+        return;
+    }
+
+    int xcell = position[0];
+    int ycell = position[1];
+    char block_char = *input;
 
     if (!uart_ready)
     {
@@ -352,15 +427,26 @@ void sendmap(int xcell, int ycell) //(float *pos, char thing)
         uart_ready = 1;
     }
 
-    char message[100];
-    snprintf(message, sizeof(message), "XCELL=%d;YCELL=%d", xcell, ycell);
-
     char buffer[200];
-    snprintf(buffer, sizeof(buffer), "%s\n", message);
+
+    /*
+       MQTT payload.
+       This sends xcell, ycell, and the char input.
+       Example:
+       {"xcell":4,"ycell":7,"input":"R"}
+    */
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "{\"xcell\":%d,\"ycell\":%d,\"input\":\"%c\"}\n",
+        xcell,
+        ycell,
+        block_char
+    );
 
     uint32_t len = strlen(buffer);
 
-    uart_send(UART0, (len) & 0xFF);
+    uart_send(UART0, len & 0xFF);
     uart_send(UART0, (len >> 8) & 0xFF);
     uart_send(UART0, (len >> 16) & 0xFF);
     uart_send(UART0, (len >> 24) & 0xFF);
@@ -370,7 +456,7 @@ void sendmap(int xcell, int ycell) //(float *pos, char thing)
         uart_send(UART0, buffer[i]);
     }
 
-    fprintf(stderr, "Sent map: %s", buffer);
+    fprintf(stderr, "Sent map MQTT payload: %s", buffer);
     fflush(stderr);
 }
 
