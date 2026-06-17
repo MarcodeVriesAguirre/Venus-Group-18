@@ -31,22 +31,13 @@ def draw_map():
 
 def handle_payload(payload):
     parts = payload.decode(errors="replace").split(",")
+    
+    x = int(parts[0])
+    y = int(parts[1])
+    type = parts[2]
+    set_tile(x, y, type[0])
 
-    if parts[0] == "Rock":
-        x = int(parts[1])
-        y = int(parts[2])
-        rock_type = parts[3]
-        set_tile(x, y, rock_type[0])
-
-    elif parts[0] == "Mountain":
-        x = int(parts[1])
-        y = int(parts[2])
-        set_tile(x, y, "M")
-
-    elif parts[0] == "Cliff":
-        x = int(parts[1])
-        y = int(parts[2])
-        set_tile(x, y, "C")
+    print(f"Received: {parts[0], parts[1], parts[2]}")
 
     draw_map()
 
