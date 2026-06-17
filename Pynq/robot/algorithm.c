@@ -13,14 +13,24 @@
 
 /* ---------- distance sensor ---------- */
 #define TOF_ADDR 0x29
-#define STOP_DISTANCE_MM 40
-#define NORMAL_SPEED 12000
+#define STOP_DISTANCE_MM 38
 
 /* ---------- turn / drive calibration ---------- */
 #define TURN_SPEED     20000
 #define STEPS_90        625   /* steps for a 90-deg turn (spin=2500 steps=360) */
 #define DRIVE_SPEED    15000
 #define STEPS_PER_CM   229    /* 1600 steps = 7 cm  ->  ~228.6 steps/cm */
+
+/* ---------- cube size measurement (angular sweep) ---------- */
+/* radians turned per in-place turn-step, derived from the turn calibration:
+ * STEPS_90 steps == 90 deg == pi/2 rad */
+#define RAD_PER_TURN_STEP   (1.57079633f / (float)STEPS_90)  /* (pi/2) / STEPS_90 */
+#define CUBE_LOST_MARGIN_MM 20   /* edge reached once distance exceeds center+this */
+#define SWEEP_STEP_CHUNK    10   /* turn-steps per sweep iteration */
+#define MAX_SWEEP_STEPS     400  /* safety cap per side (~57 deg) */
+#define SIZE_THRESHOLD_MM   25   /* width >= this -> large cube. PROVISIONAL: big
+                                  * blue measures ~37 mm; set to midpoint between
+                                  * small and large once both widths are known. */
 
 vl53x tof_sensor;
 
@@ -31,13 +41,9 @@ vl53x tof_sensor;
 #define PIN_S3   IO_AR7
 #define PIN_OUT  IO_AR8
 
-/* ---------- mapping ---------- */
-#define MAX_LEN 200
-
-#define gridSize 150
-#define blockSize 3
-#define moveperstep 0.13744
-#define radperstep 0.02513274
+/* ---------- mapping / position ---------- */
+#define radperstep 0.00251327   /* rad per turn-step for dirup(): (pi/2)/STEPS_90,
+                                  * == 2*pi/2500 (2500 steps = full 360 spin) */
 
 /* ---------- infrared line sensor (digital, from Infrared/main.c) ---------- */
 #define PIN_IR          IO_AR9
@@ -45,17 +51,30 @@ vl53x tof_sensor;
 
 #define SETTLE_US        3000
 #define TIMEOUT_US       100000
-#define SAMPLES_PER_CH   5
+#define SAMPLES_PER_CH   15
 
-#define R_MIN 55
-#define R_MAX 90
-#define G_MIN 100
-#define G_MAX 180
-#define B_MIN 100
-#define B_MAX 180
+/* white-balance references: each channel's raw period on a WHITE target.
+ * These hold at 2% output scaling (set_scaling_2). Re-measure if scaling,
+ * sensor, or read distance changes. */
+#define R_MIN 171
+#define G_MIN 255
+#define B_MIN 241
 
-#define NO_OBJECT_CLEAR_US 120
-#define RAW_DOM_MARGIN_US 8
+#define NO_OBJECT_CLEAR_US 2000   /* clear > this -> almost no light -> unknown */
+#define WHITE_SPREAD_PCT   13     /* low-chroma & bright & no blue-tilt -> WHITE */
+#define CHROMA_SPREAD_PCT  20     /* spread at/above this -> a saturated RED/BLUE.
+                                   * Kept above black's residual tilt (~19% after
+                                   * white-balance) so black is NOT called a color. */
+#define GREEN_SPREAD_PCT    9     /* desaturated green: blue most-absorbed (bn==mx)
+                                   * with at least this much spread. The green cube
+                                   * is so weak its RED channel is brightest, so it
+                                   * can't be found by "greenest channel"; the only
+                                   * stable cue is suppressed blue. */
+#define BLACK_MIN_CLEAR_US 350    /* low-chroma AND clear > this -> BLACK. Sits
+                                   * between the colors' clear (~120-240) and
+                                   * black's (~600) at the gripper read distance.
+                                   * Grows with distance: read black at the
+                                   * operating distance and re-calibrate. */
 
 typedef enum {
     FILTER_RED,
@@ -71,17 +90,10 @@ typedef struct {
     uint32_t clear_us;
 } raw_reading_t;
 
-typedef struct {
-    int r;
-    int g;
-    int b;
-} rgb_t;
-
 typedef enum {
-    COLOR_UNKNOWN   = 0,
-    COLOR_NO_OBJECT = 1,
-    COLOR_BLACK     = 2,
-    COLOR_WHITE     = 3,
+    COLOR_UNKNOWN   = 0, /* nothing useful / off-color (e.g. cardboard wall) */
+    COLOR_BLACK     = 1,
+    COLOR_WHITE     = 2,
     COLOR_RED       = 4,
     COLOR_GREEN     = 5,
     COLOR_BLUE      = 6
@@ -89,7 +101,6 @@ typedef enum {
 
 typedef struct {
     raw_reading_t raw;
-    rgb_t rgb;
     color_t color;
 } color_result_t;
 
@@ -119,9 +130,12 @@ static bool wait_for_level(io_t pin, gpio_level_t target, uint32_t timeout_us) {
 }
 
 /* ---------- color sensor internals ---------- */
-static void set_scaling_20(void) {
-    gpio_set_level(PIN_S0, GPIO_LEVEL_HIGH);
-    gpio_set_level(PIN_S1, GPIO_LEVEL_LOW);
+/* Set output scaling to 2%. Lower scaling -> lower output frequency -> ~10x
+ * longer pulse periods than 20%, which gives far more timing resolution so
+ * blue/black/green separate reliably. White-balance refs above assume this. */
+static void set_scaling_2(void) {
+    gpio_set_level(PIN_S0, GPIO_LEVEL_LOW);
+    gpio_set_level(PIN_S1, GPIO_LEVEL_HIGH);
     delay_us(SETTLE_US);
 }
 
@@ -182,50 +196,60 @@ static raw_reading_t read_raw_rgbc(void) {
     return d;
 }
 
-static int map_to_255(uint32_t x, uint32_t in_min, uint32_t in_max) {
-    if (in_max <= in_min) return 0;
-    if (x < in_min) x = in_min;
-    if (x > in_max) x = in_max;
-    long y = 255L - ((long)(x - in_min) * 255L) / (long)(in_max - in_min);
-    if (y < 0) y = 0;
-    if (y > 255) y = 255;
-    return (int)y;
-}
-
-static rgb_t raw_to_rgb(raw_reading_t d) {
-    rgb_t rgb;
-    rgb.r = map_to_255(d.red_us,   R_MIN, R_MAX);
-    rgb.g = map_to_255(d.green_us, G_MIN, G_MAX);
-    rgb.b = map_to_255(d.blue_us,  B_MIN, B_MAX);
-    return rgb;
-}
-
-static color_t guess_color(raw_reading_t raw, rgb_t rgb) {
+static color_t guess_color(raw_reading_t raw) {
     if (raw.red_us == 0 || raw.green_us == 0 || raw.blue_us == 0 || raw.clear_us == 0) {
         return COLOR_UNKNOWN;
     }
+
+    /* Almost no light on any channel -> nothing useful in front -> unknown. */
     if (raw.clear_us > NO_OBJECT_CLEAR_US) {
-        return COLOR_NO_OBJECT;
+        return COLOR_UNKNOWN;
     }
 
-    int max_rgb = rgb.r;
-    if (rgb.g > max_rgb) max_rgb = rgb.g;
-    if (rgb.b > max_rgb) max_rgb = rgb.b;
+    /* White-balance the channels. The sensor's red diodes respond faster than
+     * green/blue, so dividing each channel by its period on a WHITE target
+     * (R_MIN/G_MIN/B_MIN) makes equal light give equal values. Scaled by 1000
+     * to stay in integer math; smaller == more of that color. */
+    uint32_t rn = raw.red_us   * 1000u / R_MIN;
+    uint32_t gn = raw.green_us * 1000u / G_MIN;
+    uint32_t bn = raw.blue_us  * 1000u / B_MIN;
 
-    int min_rgb = rgb.r;
-    if (rgb.g < min_rgb) min_rgb = rgb.g;
-    if (rgb.b < min_rgb) min_rgb = rgb.b;
+    uint32_t mn = rn, mx = rn;
+    if (gn < mn) mn = gn;
+    if (bn < mn) mn = bn;
+    if (gn > mx) mx = gn;
+    if (bn > mx) mx = bn;
 
-    if (max_rgb < 50) return COLOR_BLACK;
-    if (max_rgb > 140 && min_rgb > 90 && (max_rgb - min_rgb) < 90) return COLOR_WHITE;
+    uint32_t spread = (mx - mn) * 100u;   /* compare against mn * <pct> */
 
-    if (raw.red_us + RAW_DOM_MARGIN_US < raw.green_us &&
-        raw.red_us + RAW_DOM_MARGIN_US < raw.blue_us) return COLOR_RED;
-    if (raw.green_us + RAW_DOM_MARGIN_US < raw.red_us &&
-        raw.green_us + RAW_DOM_MARGIN_US < raw.blue_us) return COLOR_GREEN;
-    if (raw.blue_us + RAW_DOM_MARGIN_US < raw.red_us &&
-        raw.blue_us + RAW_DOM_MARGIN_US < raw.green_us) return COLOR_BLUE;
+    /* A channel strongly dominates -> a saturated color (red/blue). The smallest
+     * white-balanced channel got the most light. Threshold is set above black's
+     * residual ~19% tilt so a black cube is not mistaken for a faint red. */
+    if (spread >= mn * CHROMA_SPREAD_PCT) {
+        if (rn == mn) return COLOR_RED;
+        if (gn == mn) return COLOR_GREEN;
+        return COLOR_BLUE;
+    }
 
+    /* Weak / achromatic from here down. Black first: it absorbs nearly all light,
+     * so its clear period is far longer than any color's at the read distance. */
+    if (raw.clear_us > BLACK_MIN_CLEAR_US) {
+        return COLOR_BLACK;
+    }
+
+    /* Desaturated green: too washed out to win the chroma test (its red channel
+     * is actually the brightest), but it absorbs blue more than red/green, so the
+     * blue channel is the most-absorbed (largest white-balanced) one. That tilt,
+     * plus enough spread, separates it from neutral white. */
+    if (bn == mx && spread >= mn * GREEN_SPREAD_PCT) {
+        return COLOR_GREEN;
+    }
+
+    /* Bright and essentially neutral -> white; anything else is an off-tint we
+     * don't recognize (e.g. a cardboard wall) -> unknown. */
+    if (spread < mn * WHITE_SPREAD_PCT) {
+        return COLOR_WHITE;
+    }
     return COLOR_UNKNOWN;
 }
 
@@ -243,19 +267,212 @@ void color_sensor_init(void) {
     gpio_set_direction(PIN_S3, GPIO_DIR_OUTPUT);
     gpio_set_direction(PIN_OUT, GPIO_DIR_INPUT);
 
-    set_scaling_20();
+    set_scaling_2();
     set_filter(FILTER_CLEAR);
 }
 
 color_result_t color_sensor_read(void) {
     color_result_t result;
     result.raw = read_raw_rgbc();
-    result.rgb = raw_to_rgb(result.raw);
-    result.color = guess_color(result.raw, result.rgb);
+    result.color = guess_color(result.raw);
     return result;
 }
 
-void sendmap(int *position, char *input) 
+bool distance_sensor_init(void) {
+    switchbox_set_pin(IO_AR_SCL, SWB_IIC0_SCL);
+    switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
+    iic_init(IIC0);
+
+    if (tofPing(IIC0, TOF_ADDR) != 0) {
+        printf("VL53L0X ping failed\n");
+        return false;
+    }
+    if (tofInit(&tof_sensor, IIC0, TOF_ADDR, 0) != 0) {
+        printf("VL53L0X init failed\n");
+        return false;
+    }
+    printf("VL53L0X ready\n");
+    return true;
+}
+
+uint32_t getDistance(void) {
+    return tofReadDistance(&tof_sensor);
+}
+
+/* median of 3 reads -> rejects the occasional VL53L0X glitch/stale value that
+ * would otherwise abort a sweep on a single bad sample */
+static uint32_t getDistanceStable(void) {
+    uint32_t a = getDistance();
+    uint32_t b = getDistance();
+    uint32_t c = getDistance();
+    if (a > b) { uint32_t t = a; a = b; b = t; }
+    if (b > c) { uint32_t t = b; b = c; c = t; }
+    if (a > b) { uint32_t t = a; a = b; b = t; }
+    return b;
+}
+
+void infrared_init(void) {
+    switchbox_set_pin(PIN_IR, SWB_GPIO);
+    gpio_set_direction(PIN_IR, GPIO_DIR_INPUT);
+}
+
+int infrared(void) {
+    return gpio_get_level(PIN_IR) == IR_BLACK_LEVEL;  // 1 = black, 0 = not black
+}
+
+/* ---------- movement helpers ---------- */
+void stepper_steps_pos(int x, float *pos, float *angle);
+void stepper_steps_dir(int x, int y, float *angle);
+void posup(int steps, float *pos, float *angle);
+void dirup(int x, int y, float *angle);
+
+static void wait_until_done(void) {
+    while (!stepper_steps_done()) {
+        sleep_msec(50);
+    }
+}
+
+void forward(uint16_t speed, int steps, float *pos, float *angle) {
+    stepper_set_speed(speed, speed);
+    stepper_steps_pos(steps, pos, angle);
+    wait_until_done();
+}
+
+/* turn 90 degrees to the left in place (left wheel +, right wheel -) */
+void turn_left_90(float *angle) {
+    stepper_set_speed(TURN_SPEED, TURN_SPEED);
+    stepper_steps_dir(STEPS_90, -STEPS_90, angle);
+    wait_until_done();
+}
+
+/* turn 90 degrees to the right in place (left wheel -, right wheel +) */
+void turn_right_90(float *angle) {
+    stepper_set_speed(TURN_SPEED, TURN_SPEED);
+    stepper_steps_dir(-STEPS_90, STEPS_90, angle);
+    wait_until_done();
+}
+
+/* drive forward a given distance in centimeters */
+void forward_cm(int cm, float *pos, float *angle) {
+    forward(DRIVE_SPEED, cm * STEPS_PER_CM, pos, angle);
+}
+
+void stepper_steps_pos(int x, float *pos, float *angle) {
+    stepper_steps(x, x);
+    posup(x, pos, angle);
+}
+
+void stepper_steps_dir(int x, int y, float *angle) {
+    stepper_steps(x, y);
+    dirup(x, y, angle);
+}
+
+/* ---------- mapping ---------- */
+
+void posup(int steps, float *pos, float *angle){ //function for updating x and y coordinates
+    pos[0]+=((float)steps/STEPS_PER_CM)*cos(*angle);
+    pos[1]+=((float)steps/STEPS_PER_CM)*sin(*angle);
+    printf("Coordinates: (%f, %f) \n", pos[0], pos[1]);
+}
+
+void dirup(int x, int y, float *angle){ //function for updating the direction
+    if (x>y){ //left
+        *angle+=radperstep*abs(x);
+    } else { //right
+        *angle-=radperstep*abs(x);
+    }
+    printf("Angle: %f \n", *angle);
+}
+
+/* Single-char report code for a classified cube.
+ * Upper = large, lower = small. Blue uses E/e because B/b are taken by black.
+ *   red   R/r     green G/g     white W/w     black B/b     blue E/e
+ *   '?' = object of unknown/off color (e.g. cardboard)   'N' = nothing in range */
+static char cube_code(color_t color, bool large) {
+    switch (color) {
+        case COLOR_RED:   return large ? 'R' : 'r';
+        case COLOR_GREEN: return large ? 'G' : 'g';
+        case COLOR_WHITE: return large ? 'W' : 'w';
+        case COLOR_BLACK: return large ? 'B' : 'b';
+        case COLOR_BLUE:  return large ? 'E' : 'e';
+        default:          return '?';
+    }
+}
+
+/* Human-readable label for a report code (for printing / logging). */
+static const char *cube_to_string(char code) {
+    switch (code) {
+        case 'R': return "large RED cube";
+        case 'r': return "small RED cube";
+        case 'G': return "large GREEN cube";
+        case 'g': return "small GREEN cube";
+        case 'W': return "large WHITE cube";
+        case 'w': return "small WHITE cube";
+        case 'B': return "large BLACK cube";
+        case 'b': return "small BLACK cube";
+        case 'E': return "large BLUE cube";
+        case 'e': return "small BLUE cube";
+        case 'N': return "nothing in range";
+        case '?': return "unknown object";
+        default:  return "unrecognized";
+    }
+}
+
+char detection_cube(float *angle){
+    int speed = 3075;
+    printf("detecting\n");
+
+    if (getDistance() >= 45) {
+        return 'N';   /* nothing close enough in front */
+    }
+
+    /* ---- 1. read color while still centered on the cube ---- */
+    latest_color_result = color_sensor_read();
+    color_t color = latest_color_result.color;
+
+    /* center distance is the most reliable (sensor points straight at face) */
+    uint32_t center_dist = getDistanceStable();
+    uint32_t lost = center_dist + CUBE_LOST_MARGIN_MM;
+
+    /* ---- 2. sweep LEFT (left wheel +, right wheel -) until the edge drops off ---- */
+    int steps_l = 0;
+    stepper_set_speed(speed, speed);
+    while (getDistanceStable() < lost && steps_l < MAX_SWEEP_STEPS) {
+        stepper_steps_dir(SWEEP_STEP_CHUNK, -SWEEP_STEP_CHUNK, angle);
+        wait_until_done();
+        steps_l += SWEEP_STEP_CHUNK;
+    }
+    /* return to center, then let the ToF settle before the next sweep */
+    stepper_steps_dir(-steps_l, steps_l, angle);
+    wait_until_done();
+    delay_us(50000);
+
+    /* ---- 3. sweep RIGHT until the edge drops off ---- */
+    int steps_r = 0;
+    while (getDistanceStable() < lost && steps_r < MAX_SWEEP_STEPS) {
+        stepper_steps_dir(-SWEEP_STEP_CHUNK, SWEEP_STEP_CHUNK, angle);
+        wait_until_done();
+        steps_r += SWEEP_STEP_CHUNK;
+    }
+    /* return to center */
+    stepper_steps_dir(steps_r, -steps_r, angle);
+    wait_until_done();
+
+    /* ---- 4. width = arc subtended by the cube at its distance ---- */
+    int total_steps = steps_l + steps_r;
+    float angular_width = (float)total_steps * RAD_PER_TURN_STEP;  /* radians */
+    float width_mm = (float)center_dist * angular_width;           /* chord ~ arc */
+
+    bool large = width_mm >= SIZE_THRESHOLD_MM;
+    char code = cube_code(color, large);
+
+    printf("detected %s (code '%c')  center=%u mm  steps L=%d R=%d  width=%.1f mm\n",
+           cube_to_string(code), code, center_dist, steps_l, steps_r, width_mm);
+
+    return code;
+}
+
+void sendmap(float *position, char *input) 
 {
     static int uart_ready = 0;
 
@@ -265,8 +482,8 @@ void sendmap(int *position, char *input)
         return;
     }
 
-    int xcell = position[0];
-    int ycell = position[1];
+    float xcell = position[0];
+    float ycell = position[1];
     char block_char = *input;
 
     if (!uart_ready)
@@ -291,7 +508,7 @@ void sendmap(int *position, char *input)
     snprintf(
         buffer,
         sizeof(buffer),
-        "{\"xcell\":%d,\"ycell\":%d,\"input\":\"%c\"}\n",
+        "{\"xcell\":%f,\"ycell\":%f,\"input\":\"%c\"}\n",
         xcell,
         ycell,
         block_char
@@ -311,269 +528,6 @@ void sendmap(int *position, char *input)
 
     fprintf(stderr, "Sent map MQTT payload: %s", buffer);
     fflush(stderr);
-}
-
-
-
-int main()
-{
-    int blocks = 0;
-
-
-bool distance_sensor_init(void) {
-    switchbox_set_pin(IO_AR_SCL, SWB_IIC0_SCL);
-    switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
-    iic_init(IIC0);
-
-    if (tofPing(IIC0, TOF_ADDR) != 0) {
-        printf("VL53L0X ping failed\n");
-        return false;
-    }
-    if (tofInit(&tof_sensor, IIC0, TOF_ADDR, 0) != 0) {
-        printf("VL53L0X init failed\n");
-        return false;
-    }
-    printf("VL53L0X ready\n");
-    return true;
-}
-
-uint32_t getDistance(void) {
-    return tofReadDistance(&tof_sensor);
-}
-
-void infrared_init(void) {
-    switchbox_set_pin(PIN_IR, SWB_GPIO);
-    gpio_set_direction(PIN_IR, GPIO_DIR_INPUT);
-}
-
-int infrared(void) {
-    return gpio_get_level(PIN_IR) == IR_BLACK_LEVEL;  // 1 = black, 0 = not black
-}
-
-/* ---------- movement helpers ---------- */
-static void wait_until_done(void) {
-    while (!stepper_steps_done()) {
-        sleep_msec(50);
-    }
-}
-
-void forward(uint16_t speed, int steps, float *pos, float *angle) {
-    stepper_set_speed(speed, speed);
-    stepper_steps_pos(steps, pos, angle);
-    wait_until_done();
-}
-
-/* turn 90 degrees to the left in place (left wheel +, right wheel -) */
-void turn_left_90(float *angle) {
-    stepper_set_speed(TURN_SPEED, TURN_SPEED);
-    stepper_steps_dir(STEPS_90, -STEPS_90, angle);
-    wait_until_done();
-}
-
-/* drive forward a given distance in centimeters */
-void forward_cm(int cm, float *pos, float *angle) {
-    forward(DRIVE_SPEED, cm * STEPS_PER_CM);
-}
-
-void stepper_steps_pos(int x, float *pos, float *angle) {
-    stepper_steps(x, x);
-    posup(x, pos, angle);
-}
-
-void stepper_steps_dir(int x, int y, float *angle) {
-    stepper_steps(x, y);
-    dirup(x, y, angle);
-}
-
-/* ---------- mapping ---------- */
-
-void posup(int steps, float *pos, float *angle){ //function for updating x and y coordinates
-    pos[0]+=(1/STEPS_PER_CM)*steps*cos(*angle);
-    pos[1]+=(1/STEPS_PER_CM)*steps*sin(*angle);
-    printf("Coordinates: (%f, %f)", pos[0], pos[1]);
-}
-
-void dirup(int x, int y, float *angle){ //function for updating the direction
-    if (x>y){ //left
-        *angle+=radperstep*abs(x);
-    } else { //right
-        *angle-=radperstep*abs(x);
-    }
-    printf("Angle: %f", *angle);
-}
-
-void sendmap(int *position, char *input) 
-{
-    static int uart_ready = 0;
-
-    if (position == NULL || input == NULL)
-    {
-        fprintf(stderr, "sendmap error: NULL pointer\n");
-        return;
-    }
-
-    int xcell = position[0];
-    int ycell = position[1];
-    char block_char = *input;
-
-    if (!uart_ready)
-    {
-        switchbox_set_pin(IO_AR0, SWB_UART0_RX);
-        switchbox_set_pin(IO_AR1, SWB_UART0_TX);
-
-        uart_init(UART0);
-        uart_reset_fifos(UART0);
-
-        uart_ready = 1;
-    }
-
-    char buffer[200];
-
-    /*
-       MQTT payload.
-       This sends xcell, ycell, and the char input.
-       Example:
-       {"xcell":4,"ycell":7,"input":"R"}
-    */
-    snprintf(
-        buffer,
-        sizeof(buffer),
-        "{\"xcell\":%d,\"ycell\":%d,\"input\":\"%c\"}\n",
-        xcell,
-        ycell,
-        block_char
-    );
-
-    uint32_t len = strlen(buffer);
-
-    uart_send(UART0, len & 0xFF);
-    uart_send(UART0, (len >> 8) & 0xFF);
-    uart_send(UART0, (len >> 16) & 0xFF);
-    uart_send(UART0, (len >> 24) & 0xFF);
-
-    for (uint32_t i = 0; i < len; i++)
-    {
-        uart_send(UART0, buffer[i]);
-    }
-
-    fprintf(stderr, "Sent map MQTT payload: %s", buffer);
-    fflush(stderr);
-}
-
-char detection_cube(float *angle){
-int steps_left;
-int left_side;
-int right_side;
-int size;
-char kube;
-float angle_L;
-float angle_R;
-float angle_T;
-char color;
-int speed=3075;
-printf("detecting\n");
-if(getDistance() < 45){
-    //wait_until_done();
-    latest_color_result = color_sensor_read();
-    if(latest_color_result.color == COLOR_WHITE){
-        color = 'W';
-    }
-    if(latest_color_result.color == COLOR_BLACK){
-        color = 'B';
-    }
-    if(latest_color_result.color == COLOR_BLUE){
-        color = 'b';
-    }
-    if(latest_color_result.color == COLOR_GREEN){
-        color = 'G';
-    }
-    if(latest_color_result.color == COLOR_RED){
-        color = 'R';
-    }
-    
-    while(getDistance() < 60){
-        stepper_set_speed(speed, speed);
-        stepper_steps_dir(10, -10, angle);
-        printf("dist: %d\n", getDistance());
-        steps_left = steps_left + 10;
-        left_side = getDistance();
-    }
-    wait_until_done();
-    printf("idk\n");
-    angle_L = *angle;
-    stepper_steps_dir(-10, 10, angle);
-    wait_until_done();
-    stepper_steps_dir(-10, 10, angle);
-    wait_until_done();
-    stepper_steps_dir(-10, 10, angle);
-    wait_until_done();
-
-    while(getDistance() < 60){
-        stepper_set_speed(speed, speed);
-        stepper_steps_dir(-10, 10, angle);
-        right_side = getDistance();
-        dirup(angle, 1);
-    }
-    wait_until_done();
-    angle_R = *angle;
-
-    angle_T = angle_R - angle_L;
-    size = sqrt(pow(left_side, 2) + pow(right_side, 2) - 2 * left_side * right_side * cos(angle_T));
-
-    if(size > 43){
-        if(color == 'R'){
-            kube = 'R';
-            return kube;
-        }
-        if(color == 'W'){
-            kube = 'W';
-            return kube;
-        }
-        if(color == 'G'){
-            kube = 'G';
-            return kube;
-        }
-        if(color == 'R'){
-            kube = 'R';
-            return kube;
-        }
-        if(color == 'B'){
-            kube = 'B';
-            return kube;
-        }
-        if(color == 'b'){
-            kube = 'E';
-            return kube;
-        }
-    }
-    else{
-        if(color == 'R'){
-            kube = 'r';
-            return kube;
-        }
-        if(color == 'W'){
-            kube = 'w';
-            return kube;
-        }
-        if(color == 'G'){
-            kube = 'g';
-            return kube;
-        }
-        if(color == 'R'){
-            kube = 'r';
-            return kube;
-        }
-        if(color == 'B'){
-            kube = 'b';
-            return kube;
-        }
-        if(color == 'b'){
-            kube = 'e';
-            return kube;
-        }
-    }
-}
-return 'g';
 }
 
 /* ---------- main ---------- */
@@ -583,6 +537,8 @@ int main(void) {
     stepper_enable();
     float angle_first=0.0;
     float *angle=&angle_first;
+    float pos_first[]={0.0, 0.0};
+    float *pos=pos_first;
     char cube;
 
     setbuf(stdout, NULL);
@@ -603,22 +559,46 @@ int main(void) {
         // latest_color_result = color_sensor_read();
 
         stepper_set_speed(speed, speed);
-        stepper_steps(10, 10);
+        stepper_steps_pos(10, pos, angle);
+        int direction = 0; // 0 = left, 1 = right (for boundary avoidance)
 
         if (infrared()) {            // IR sensor sees black
             wait_until_done();
             printf("boundary detected, turning around it\n");
-            turn_left_90();          // turn 90 deg left
-            forward_cm(5);           // go forward 5 cm
-            turn_left_90();          // turn 90 deg left again
-            continue;                // resume driving forward
+            if (direction == 0) {
+                turn_left_90(angle);          // turn 90 deg left
+                forward_cm(3, pos, angle);           // go forward 5 cm
+                turn_left_90(angle);          // turn 90 deg left again
+                direction +=1 % 2;   // alternate direction for next time
+                continue;                // resume driving forward
+            } else {
+                turn_right_90(angle);         // turn 90 deg right
+                forward_cm(3, pos, angle);           // go forward 5 cm
+                turn_right_90(angle);         // turn 90 deg right again
+                direction +=1 % 2;   // alternate direction for next time
+                continue;                // resume driving forward
+            }
+            
+           
         }
         
-        if (getDistance() < STOP_DISTANCE_MM) {   // safety: obstacle ahead
+         if (getDistance() < STOP_DISTANCE_MM) {   // obstacle ahead
             wait_until_done();
             cube = detection_cube(angle);
-            printf("obstacle detected(%c), stopped\n", cube);
-            break;
+
+            // report every detection to the computer, then keep exploring
+            sendmap(pos_first, &cube);
+            printf("obstacle detected: %s (code '%c')\n",
+                   cube_to_string(cube), cube);
+
+            // steer around the obstacle so we don't re-detect it in place
+            turn_left_90(angle);
+            forward_cm(5, pos, angle);
+            turn_right_90(angle);
+            forward_cm(7, pos, angle);
+            turn_right_90(angle);
+            forward_cm(5, pos, angle);
+            turn_left_90(angle);
         }
     }
 
@@ -627,3 +607,7 @@ int main(void) {
     pynq_destroy();
     return 0;
 }
+
+
+
+
