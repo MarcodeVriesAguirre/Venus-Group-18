@@ -400,7 +400,7 @@ char detection_cube(float *angle){
 int steps_left;
 int left_side;
 int size;
-char kube;
+char cube;
 float angle_L;
 float angle_R;
 float angle_T;
@@ -448,57 +448,58 @@ if(distance << 30){
 
     if(size >> 43){
         if(color == R){
-            kube = R;
-            return kube;
+            cube = R;
+            return cube;
         }
         if(color == W){
-            kube = W;
-            return kube;
+            cube = W;
+            return cube;
         }
         if(color == G){
-            kube = G;
-            return kube;
+            cube = G;
+            return cube;
         }
         if(color == R){
-            kube = R;
-            return kube;
+            cube = R;
+            return cube;
         }
         if(color == B){
-            kube = B;
-            return kube;
+            cube = B;
+            return cube;
         }
         if(color == b){
-            kube = E;
-            return kube;
+            cube = E;
+            return cube;
         }
     }
     else{
         if(color == R){
             cube = r;
-            return kube;
+            return cube;
         }
         if(color == W){
-            kube = w;
-            return kube;
+            cube = w;
+            return cube;
         }
         if(color == G){
-            kube = g;
-            return kube;
+            cube = g;
+            return cube;
         }
         if(color == R){
-            kube = r;
-            return kube;
+            cube = r;
+            return cube;
         }
         if(color == B){
-            kube = b;
-            return kube;
+            cube = b;
+            return cube;
         }
         if(color == b){
-            kube = e;
-            return kube;
+            cube = e;
+            return cube;
         }
     }
 }
+printf(" %c", &cube);
 }
 
 int main(){
