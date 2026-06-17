@@ -1,7 +1,36 @@
-WIDTH = 50
-HEIGHT = 50
+WIDTH = 20
+HEIGHT = 20
 
 game_map = [["." for _ in range(WIDTH)] for _ in range(HEIGHT)]
+
+# Border of cliffs
+for x in range(WIDTH):
+    game_map[0][x] = "C"
+    game_map[HEIGHT - 1][x] = "C"
+
+for y in range(HEIGHT):
+    game_map[y][0] = "C"
+    game_map[y][WIDTH - 1] = "C"
+
+# Mountain square in the center (6x6)
+for y in range(7, 11):
+    for x in range(7, 11):
+        game_map[y][x] = "M"
+
+for y in range(12, 16):
+    for x in range(12, 15):
+        game_map[y][x] = "C"
+
+# One of each resource/entity
+game_map[2][6] = "r"
+game_map[6][3] = "g"
+game_map[3][16] = "b"
+game_map[14][17] = "w"
+game_map[8][14] = "e"
+
+game_map[15][2] = "R"
+game_map[17][5] = "G"
+game_map[12][8] = "B"
 
 
 def set_tile(x, y, value):
@@ -15,41 +44,4 @@ def draw_map():
     print()
 
 
-def handle_payload(payload):
-    parts = payload.split(",")
-
-    if parts[0] == "Rock":
-        x = int(parts[1]) #owo
-        y = int(parts[2])
-        rock_type = parts[3]
-        set_tile(x, y, rock_type[0])
-
-    elif parts[0] == "Mountain":
-        x = int(parts[1])
-        y = int(parts[2])
-        set_tile(x, y, "M")
-
-    elif parts[0] == "Cliff":
-        x = int(parts[1])
-        y = int(parts[2])
-        set_tile(x, y, "C")
-
-    draw_map()
-
-
-print("Enter commands:")
-print("  Rock,x,y,type")
-print("  Mountain,x,y")
-print("  Cliff,x,y")
-print("  quit")
-
-while True:
-    command = input("> ").strip()
-
-    if command.lower() == "quit":
-        break
-
-    try:
-        handle_payload(command)
-    except Exception as e:
-        print("Invalid command:", e)
+draw_map()
