@@ -2,73 +2,117 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdarg.h>
+#include <sys/select.h> 
+#include <unistd.h>    
 
-void send_uart_msg(const char format, ...) {
-    char payload[256];
-    va_list args;
+#define MAX_LEN 200
 
-    va_start(args, format);
-    vsnprintf(payload, sizeof(payload), format, args);
-    va_end(args);
+void send_message(char *msg)
+{
+    char buffer[MAX_LEN];
+    
+    snprintf(buffer, sizeof(buffer), "%s\n", msg);
+    uint32_t len = strlen(buffer);
 
-    uint32_t len = (uint32_t)strlen(payload) + 1;
+    uart_send(UART0, (len) & 0xFF);
+    uart_send(UART0, (len >> 8) & 0xFF);
+    uart_send(UART0, (len >> 16) & 0xFF);
+    uart_send(UART0, (len >> 24) & 0xFF);
 
-    if(gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW) {
-        printf("Waiting for ESP32 to be ready on pin AR3...\n");
-        // Loop until AR3 goes HIGH
-        while(gpio_get_level(IO_AR3) == GPIO_LEVEL_LOW) {
-            sleep_msec(10); 
-        }
-    }
+    for (uint32_t i = 0; i < len; i++)
+        uart_send(UART0, buffer[i]);
 
-    uint8_tlen_bytes = (uint8_t)&len;
-    for(int i = 0; i < 4; i++) {
-        uart_send(UART0, len_bytes[i]);
-    }
-
-    for(uint32_t i = 0; i < len; i++) {
-        uart_send(UART0, payload[i]);
-    }
+    fprintf(stderr, "Sent: %s", buffer);
+    fflush(stderr); 
 }
 
-double get_temperature() { return 24.5; }
-int get_distance() { return 150; }
-const char get_color() { return "RED"; }
-
-int main(void) {
+int main(void)
+{
     pynq_init();
-    adc_init();
-    buttons_init(); 
-    switchbox_init(); 
-
-    gpio_set_direction(IO_AR3, GPIO_DIR_INPUT);
 
     switchbox_set_pin(IO_AR0, SWB_UART0_RX);
     switchbox_set_pin(IO_AR1, SWB_UART0_TX);
 
     uart_init(UART0);
-    uart_reset_fifos(UART0); // Clear out any old junk data
+    uart_reset_fifos(UART0);
 
-    printf("Robot 49 is starting... Press Button 0 to stop.\n");
+    sleep_msec(5000);
 
-    while(!get_button_state(BUTTON0)) {
-        double temp = get_temperature();
-        int dist    = get_distance();
-        const char* color = get_color();
+    fprintf(stderr, "Type a message and press Enter to send.\n");
+    fflush(stderr);
 
-        // Send the JSON string to the ESP32
-        send_uart_msg("{"id":"49", "temp": %.2f, "dist": %d, "color": "%s"}", temp, dist, color);
+    uint32_t len = 0;
+    uint32_t bytes_read = 0;
+    char buffer[MAX_LEN];
+    char input[100];
 
-        printf("Sent data: Temp %.2f, Dist %d, Color %s\n", temp, dist, color);
-        sleep_msec(500);
+    while (1)
+    {
+      
+        if (bytes_read < 4)
+        {
+            while (uart_has_data(UART0) && bytes_read < 4)
+            {
+                uint8_t byte = uart_recv(UART0);
+                len |= (byte << (8 * bytes_read));
+                bytes_read++;
+            }
+
+            if (bytes_read == 4)
+            {
+                if (len > MAX_LEN)
+                {
+                    fprintf(stderr, "Invalid LEN: %u\n", len);
+                    fflush(stderr);
+                    len = 0;
+                    bytes_read = 0;
+                }
+            }
+        }
+        else
+        {
+            uint32_t payload_bytes = bytes_read - 4;
+
+            while (uart_has_data(UART0) && payload_bytes < len)
+            {
+                buffer[payload_bytes++] = uart_recv(UART0);
+                bytes_read++;
+            }
+
+            if (payload_bytes == len)
+            {
+                buffer[len] = '\0';
+                
+                buffer[strcspn(buffer, "\r\n")] = 0; 
+                
+                fprintf(stderr, "Received: %s\n", buffer);
+                fflush(stderr); // Force instant update
+
+                len = 0;
+                bytes_read = 0;
+            }
+        }
+
+        fd_set readfds;
+        struct timeval tv;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        tv.tv_sec = 0;
+        tv.tv_usec = 0; 
+
+        if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv) > 0)
+        {
+            if (fgets(input, sizeof(input), stdin) != NULL)
+            {
+                input[strcspn(input, "\n")] = 0; 
+                send_message(input);
+            }
+        }
+
+        sleep_msec(10); 
     }
 
-    printf("\nShutting down...\n");
-    uart_destroy(UART0);
-    switchbox_destroy();
-    adc_destroy();
-    buttons_destroy();
     pynq_destroy();
     return 0;
 }
