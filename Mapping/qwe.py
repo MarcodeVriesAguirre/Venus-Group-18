@@ -19,12 +19,8 @@ HEIGHT = 50
 game_map = [["." for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
 
-def set_tile(name, x, y, value):
-    if name == "Julius":
-        if 0 <= x < WIDTH and 0 <= y < HEIGHT:
-            game_map[x][y] = value
-    elif name == "Javier":
-        if 0 <= x < WIDTH and 0 <= y < HEIGHT:
+def set_tile(x, y, value):
+    if 0 <= x < WIDTH and 0 <= y < HEIGHT:
             game_map[x][y] = value
 
 
@@ -36,14 +32,13 @@ def draw_map():
 
 def handle_payload(payload):
     parts = payload.decode(errors="replace").split(",")
-    
-    name = parts[0]
-    x = int(float(parts[1])) + 25
-    y = int(float(parts[2])) + 25
-    type = parts[3]
-    set_tile(name,x, y, type[0])
 
-    print(f"Received: {name}, {x}, {y}, {type}")
+    x = int(float(parts[0])) + 25
+    y = int(float(parts[1])) + 25
+    type = parts[2]
+    set_tile(x, y, type[0])
+
+    print(f"Received: {x}, {y}, {type}")
 
     draw_map()
 
