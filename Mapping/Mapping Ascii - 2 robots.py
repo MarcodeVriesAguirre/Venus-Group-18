@@ -12,8 +12,8 @@ USER2 = "robot_18_1"
 PASS2 = "mv6p0Gzx"
 RECV2 = ["/pynqbridge/18/send"]
 
-WIDTH = 50
-HEIGHT = 50
+WIDTH = 25
+HEIGHT = 25
 
 game_map = [["." for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
@@ -32,8 +32,8 @@ def draw_map():
 def handle_payload(payload):
     parts = payload.decode(errors="replace").split(",")
     
-    x = int(parts[0])
-    y = int(parts[1])
+    x = int(float(parts[0])) +1
+    y = int(float(parts[1])) +1
     type = parts[2]
     set_tile(x, y, type[0])
 
