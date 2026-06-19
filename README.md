@@ -1,20 +1,23 @@
 # Pynq
 
-C source for the robot, built against libpynq.
+The robot code plus a test program for each sensor. Every folder builds to a
+`main` and can be executed on the board as follows:
 
-## Layout
-- drivers/        shared sensor drivers (no main())
-- distance_test/  standalone VL53L0X test
-- color_test/     standalone TCS3472 test
-- robot/          main robot program
+```sh
+cd <folder>
+make
+./main
+```
 
-## Build (on the PYNQ, one-time setup)
-    cd ~/libpynq-5EID0-2023-v0.3.0/applications
-    ln -sf ~/Venus-Group-18/Pynq/distance_test .
-    ln -sf ~/Venus-Group-18/Pynq/color_test .
-    ln -sf ~/Venus-Group-18/Pynq/robot .
+## Folders
 
-## Build any app
-    cd ~/libpynq-5EID0-2023-v0.3.0/applications/robot
-    make
-    sudo ./main
+- **robot/** — the full robot. `algorithm.c` is the main code that runs on the robot: it drives up to an
+  object with the distance sensor, sweeps to measure cube width (small / large /
+  mountain), reads its color, and tracks position on the grid. The rest are
+  helpers: `movement.c` (motors/turning), `communication.c` (UART),
+  `shared.h` (shared data)
+- **color_test/** — reads the color sensor and classifies the surface (`main.c`).
+- **distance_test/** — prints distance from the VL53L0X ToF sensor (`main.c`).
+- **Infrared/** — prints the IR sensor level (0/1) for edge detection (`main.c`).
+- **temperature/** — reads the thermistor and converts it to °C (`main.c`).
+- **Comunication/** — PC-side scripts to talk to the robot (not a make/run folder).
