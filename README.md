@@ -1,6 +1,10 @@
 # Pynq
 
-The robot code plus a test program for each sensor. Every folder builds to a
+Project Venus is an autonomous PYNQ two robot system that explores an unknown arena on its
+own. It has to find the cubes scattered around, drive up to each one, identify it
+by size (small / large) and color, and avoid a cardboard "mountain", all while
+mapping its position on a grid. This folder holds the robot code plus a test
+program for each sensor. Every folder builds to a
 `main` and can be executed on the board as follows:
 
 ```sh
