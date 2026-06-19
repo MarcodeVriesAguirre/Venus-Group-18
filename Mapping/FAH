@@ -66,7 +66,7 @@ def handle_payload(payload):
     set_tile(x, y, symbol)
 
     print(
-        f"Received: x={x}, y={y}, type={cube_type}, temp={temperature:.2f}C"
+        f"Received: x={x}, y={y}, type={cube_type}, temp={temperature:.1f}C"
     )
 
     draw_map_and_table()
