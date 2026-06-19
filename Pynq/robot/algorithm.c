@@ -31,6 +31,9 @@
 #define SIZE_THRESHOLD_MM   25   /* width >= this -> large cube. PROVISIONAL: big
                                   * blue measures ~37 mm; set to midpoint between
                                   * small and large once both widths are known. */
+#define MOUNTAIN_WIDTH_MM   50   /* width >= this -> not a cube at all, it's the
+                                  * cardboard "mountain". Set above the largest
+                                  * real cube width (big blue ~37 mm). */
 
 vl53x tof_sensor;
 
@@ -70,6 +73,13 @@ vl53x tof_sensor;
                                    * is so weak its RED channel is brightest, so it
                                    * can't be found by "greenest channel"; the only
                                    * stable cue is suppressed blue. */
+/* brown/cardboard rejection: real cubes read the same color every time, brown
+ * does not. Read COLOR_VOTE_SAMPLES times; need COLOR_VOTE_REQUIRED to agree,
+ * else the object is reported UNKNOWN. Raise REQUIRED toward SAMPLES to reject
+ * brown harder; lower it if real cubes get wrongly rejected at distance. */
+#define COLOR_VOTE_SAMPLES   5
+#define COLOR_VOTE_REQUIRED  4
+
 #define BLACK_MIN_CLEAR_US 350    /* low-chroma AND clear > this -> BLACK. Sits
                                    * between the colors' clear (~120-240) and
                                    * black's (~600) at the gripper read distance.
@@ -275,7 +285,35 @@ color_result_t color_sensor_read(void) {
     color_result_t result;
     result.raw = read_raw_rgbc();
     result.color = guess_color(result.raw);
+    /* DEBUG: raw channel periods (us) for calibrating new colors like brown */
+    printf("RAW  R=%u  G=%u  B=%u  C=%u\n",
+           result.raw.red_us, result.raw.green_us,
+           result.raw.blue_us, result.raw.clear_us);
     return result;
+}
+
+/* Brown / cardboard reads a different color almost every time, while real cubes
+ * read the same color consistently. Sample several times and only trust a color
+ * if at least COLOR_VOTE_REQUIRED of the reads agree; otherwise call it UNKNOWN
+ * so the caller treats it as brown (sidestep and retry). */
+static color_t color_sensor_read_voted(void) {
+    int votes[COLOR_BLUE + 1] = {0};   /* color_t values run 0..COLOR_BLUE */
+
+    for (int i = 0; i < COLOR_VOTE_SAMPLES; i++) {
+        color_t c = color_sensor_read().color;
+        votes[c]++;
+    }
+
+    color_t best = COLOR_UNKNOWN;
+    int best_votes = 0;
+    for (int c = 0; c <= COLOR_BLUE; c++) {
+        if (votes[c] > best_votes) { best_votes = votes[c]; best = (color_t)c; }
+    }
+
+    if (best != COLOR_UNKNOWN && best_votes >= COLOR_VOTE_REQUIRED) {
+        return best;
+    }
+    return COLOR_UNKNOWN;   /* inconsistent -> treat as brown/unknown */
 }
 
 bool distance_sensor_init(void) {
@@ -283,10 +321,18 @@ bool distance_sensor_init(void) {
     switchbox_set_pin(IO_AR_SDA, SWB_IIC0_SDA);
     iic_init(IIC0);
 
-    if (tofPing(IIC0, TOF_ADDR) != 0) {
-        printf("VL53L0X ping failed\n");
-        return false;
+    sleep_msec(100);   // let the I2C bus + sensor settle after power-up
+
+    /* the VL53L0X can miss the first ping(s) right after power; retry a few times */
+    int tries = 0;
+    while (tofPing(IIC0, TOF_ADDR) != 0) {
+        if (++tries >= 10) {
+            printf("VL53L0X ping failed\n");
+            return false;
+        }
+        sleep_msec(100);
     }
+
     if (tofInit(&tof_sensor, IIC0, TOF_ADDR, 0) != 0) {
         printf("VL53L0X init failed\n");
         return false;
@@ -294,6 +340,7 @@ bool distance_sensor_init(void) {
     printf("VL53L0X ready\n");
     return true;
 }
+
 
 uint32_t getDistance(void) {
     return tofReadDistance(&tof_sensor);
@@ -318,6 +365,28 @@ void infrared_init(void) {
 
 int infrared(void) {
     return gpio_get_level(PIN_IR) == IR_BLACK_LEVEL;  // 1 = black, 0 = not black
+}
+
+/* ---------- temperature sensor (NTC thermistor on ADC0) ---------- */
+#define TEMP_BETA   4050.0    /* thermistor beta coefficient */
+#define TEMP_V_REF  3.3       /* ADC reference voltage */
+#define TEMP_R2     1000.0    /* 1k fixed resistor */
+#define TEMP_R0     10000.0   /* 10k NTC nominal resistance */
+#define TEMP_T0     298.15    /* 25C in Kelvin */
+
+/* convert thermistor resistance (ohms) to temperature (Celsius) */
+double r_to_t(double r_t) {
+    double T = 1.0 / ((1.0 / TEMP_T0) + (1.0 / TEMP_BETA) * log(r_t / TEMP_R0));
+    return T - 273.15;
+}
+
+/* read ADC0, convert the divider voltage to resistance, then to Celsius.
+ * Returns -999.0 on a bad / zero reading. */
+double read_temperature(void) {
+    double v_out = adc_read_channel(ADC0);
+    if (v_out <= 0.0) return -999.0;
+    double r_t = (TEMP_V_REF - v_out) * TEMP_R2 / v_out;
+    return r_to_t(r_t);
 }
 
 /* ---------- movement helpers ---------- */
@@ -357,6 +426,23 @@ void forward_cm(int cm, float *pos, float *angle) {
     forward(DRIVE_SPEED, cm * STEPS_PER_CM, pos, angle);
 }
 
+/* Turn around an obstacle (the arena boundary or a mountain): swing 90, step
+ * forward, swing 90 the same way. *direction (0=left, 1=right) picks the side
+ * and alternates each call. Used for both IR-boundary and mountain handling so
+ * they behave identically. */
+static void avoid_obstacle(float *pos, float *angle, int *direction) {
+    if (*direction == 0) {
+        turn_left_90(angle);
+        forward_cm(3, pos, angle);
+        turn_left_90(angle);
+    } else {
+        turn_right_90(angle);
+        forward_cm(3, pos, angle);
+        turn_right_90(angle);
+    }
+    *direction = (*direction + 1) % 2;
+}
+
 void stepper_steps_pos(int x, float *pos, float *angle) {
     stepper_steps(x, x);
     posup(x, pos, angle);
@@ -372,7 +458,7 @@ void stepper_steps_dir(int x, int y, float *angle) {
 void posup(int steps, float *pos, float *angle){ //function for updating x and y coordinates
     pos[0]+=((float)steps/STEPS_PER_CM)*cos(*angle);
     pos[1]+=((float)steps/STEPS_PER_CM)*sin(*angle);
-    printf("Coordinates: (%f, %f) \n", pos[0], pos[1]);
+    // printf("Coordinates: (%f, %f) \n", pos[0], pos[1]);
 }
 
 void dirup(int x, int y, float *angle){ //function for updating the direction
@@ -412,6 +498,7 @@ static const char *cube_to_string(char code) {
         case 'b': return "small BLACK cube";
         case 'E': return "large BLUE cube";
         case 'e': return "small BLUE cube";
+        case 'M': return "mountain";
         case 'N': return "nothing in range";
         case '?': return "unknown object";
         default:  return "unrecognized";
@@ -427,8 +514,9 @@ char detection_cube(float *angle){
     }
 
     /* ---- 1. read color while still centered on the cube ---- */
-    latest_color_result = color_sensor_read();
-    color_t color = latest_color_result.color;
+    /* voted read: inconsistent (brown/cardboard) comes back UNKNOWN -> '?' */
+    color_t color = color_sensor_read_voted();
+    latest_color_result.color = color;
 
     /* center distance is the most reliable (sensor points straight at face) */
     uint32_t center_dist = getDistanceStable();
@@ -463,6 +551,17 @@ char detection_cube(float *angle){
     float angular_width = (float)total_steps * RAD_PER_TURN_STEP;  /* radians */
     float width_mm = (float)center_dist * angular_width;           /* chord ~ arc */
 
+    /* Too wide to be a cube -> it's the cardboard "mountain". Either the sweep
+     * never found an edge (maxed out) or the measured width exceeds any cube.
+     * Brown cardboard is optically identical to white to this sensor, so size is
+     * the only reliable way to tell them apart. */
+    if (steps_l >= MAX_SWEEP_STEPS || steps_r >= MAX_SWEEP_STEPS ||
+        width_mm >= MOUNTAIN_WIDTH_MM) {
+        printf("width %.1f mm (steps L=%d R=%d) -> mountain, code 'M'\n",
+               width_mm, steps_l, steps_r);
+        return 'M';
+    }
+
     bool large = width_mm >= SIZE_THRESHOLD_MM;
     char code = cube_code(color, large);
 
@@ -472,7 +571,7 @@ char detection_cube(float *angle){
     return code;
 }
 
-void sendmap(float *position, char *input) 
+void sendmap(float *position, char *input, double temperature)
 {
     static int uart_ready = 0;
 
@@ -501,17 +600,18 @@ void sendmap(float *position, char *input)
 
     /* w
        MQTT payload.
-       This sends xcell, ycell, and the char input.
+       This sends xcell, ycell, the char input, and the cube temperature (C).
        Example:
-       {"xcell":4,"ycell":7,"input":"R"}
+       4.0,7.0,R,23.5
     */
     snprintf(
         buffer,
         sizeof(buffer),
-        "{\"xcell\":%f,\"ycell\":%f,\"input\":\"%c\"}\n",
+        "%f,%f,%c,%f",
         xcell,
         ycell,
-        block_char
+        block_char,
+        temperature
     );
 
     uint32_t len = strlen(buffer);
@@ -542,11 +642,14 @@ int main(void) {
     char cube;
 
     setbuf(stdout, NULL);
+    adc_init();
     color_sensor_init();
     infrared_init();
+    
     if (!distance_sensor_init()) {
         printf("aborting: distance sensor unavailable\n");
         iic_destroy(IIC0);
+        adc_destroy();
         stepper_destroy();
         pynq_destroy();
         return 1;
@@ -555,39 +658,42 @@ int main(void) {
 
     int speed = 3075;
 
+    int direction = 0; // 0 = left, 1 = right (for boundary avoidance)
+
     while (1) {
         // latest_color_result = color_sensor_read();
 
         stepper_set_speed(speed, speed);
         stepper_steps_pos(10, pos, angle);
-        int direction = 0; // 0 = left, 1 = right (for boundary avoidance)
+
 
         if (infrared()) {            // IR sensor sees black
             wait_until_done();
             printf("boundary detected, turning around it\n");
-            if (direction == 0) {
-                turn_left_90(angle);          // turn 90 deg left
-                forward_cm(3, pos, angle);           // go forward 5 cm
-                turn_left_90(angle);          // turn 90 deg left again
-                direction +=1 % 2;   // alternate direction for next time
-                continue;                // resume driving forward
-            } else {
-                turn_right_90(angle);         // turn 90 deg right
-                forward_cm(3, pos, angle);           // go forward 5 cm
-                turn_right_90(angle);         // turn 90 deg right again
-                direction +=1 % 2;   // alternate direction for next time
-                continue;                // resume driving forward
-            }
-            
-           
+            avoid_obstacle(pos, angle, &direction);
+            continue;                // resume driving forward
         }
         
-         if (getDistance() < STOP_DISTANCE_MM) {   // obstacle ahead
-            wait_until_done();
-            cube = detection_cube(angle);
+        if (getDistance() < STOP_DISTANCE_MM) {   // obstacle ahead
+        wait_until_done();
+        cube = detection_cube(angle);
 
-            // report every detection to the computer, then keep exploring
-            sendmap(pos_first, &cube);
+            // read the cube's temperature while it's still in front of the
+            // sensor, before we maneuver away from it.
+            double cube_temp = read_temperature();
+            printf("cube temperature: %.1f C\n", cube_temp);
+
+            // mountain: report it, then turn around it exactly like the IR
+            // boundary (same avoid_obstacle maneuver), then resume.
+            if (cube == 'M') {
+                sendmap(pos_first, &cube, cube_temp);
+                printf("mountain reported, turning around it\n");
+                avoid_obstacle(pos, angle, &direction);
+                continue;
+            }
+
+            // real cube: report to the computer, then go around it
+            sendmap(pos_first, &cube, cube_temp);
             printf("obstacle detected: %s (code '%c')\n",
                    cube_to_string(cube), cube);
 
@@ -603,6 +709,7 @@ int main(void) {
     }
 
     iic_destroy(IIC0);
+    adc_destroy();
     stepper_destroy();
     pynq_destroy();
     return 0;
@@ -610,4 +717,4 @@ int main(void) {
 
 
 
-
+ 
